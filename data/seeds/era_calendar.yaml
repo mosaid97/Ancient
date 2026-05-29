@@ -1,0 +1,433 @@
+# 紀年 → CE converter seed.
+# Source: standard reign-period (年號) + sexagenary (干支) tables.
+# Coverage: full 唐 (618-907) since corpus is Tang; selected eras for 隋/五代/
+# 北宋 (so secondary citations resolve). Expand later via Phase 11.
+#
+# Notes on usage:
+#   apps/backend/normalize/era.py converts strings like "貞觀十九年" or
+#   "武德元年" or "貞觀乙巳" into a CE year. For 干支 inside a known era,
+#   the converter walks the sexagenary cycle.
+#   `era_name + N年` -> start_year + N - 1.
+#   `元年` is N=1.
+#
+# 干支 (sexagenary) cycle reference, in order. The 60-year cycle anchors at
+# 甲子 = year 4 BC of CE (or, equivalently, AD 4 = 甲子 in the +60n cycle
+# convention used by 中國天文年曆).
+
+ganzhi_cycle:
+  - 甲子
+  - 乙丑
+  - 丙寅
+  - 丁卯
+  - 戊辰
+  - 己巳
+  - 庚午
+  - 辛未
+  - 壬申
+  - 癸酉
+  - 甲戌
+  - 乙亥
+  - 丙子
+  - 丁丑
+  - 戊寅
+  - 己卯
+  - 庚辰
+  - 辛巳
+  - 壬午
+  - 癸未
+  - 甲申
+  - 乙酉
+  - 丙戌
+  - 丁亥
+  - 戊子
+  - 己丑
+  - 庚寅
+  - 辛卯
+  - 壬辰
+  - 癸巳
+  - 甲午
+  - 乙未
+  - 丙申
+  - 丁酉
+  - 戊戌
+  - 己亥
+  - 庚子
+  - 辛丑
+  - 壬寅
+  - 癸卯
+  - 甲辰
+  - 乙巳
+  - 丙午
+  - 丁未
+  - 戊申
+  - 己酉
+  - 庚戌
+  - 辛亥
+  - 壬子
+  - 癸丑
+  - 甲寅
+  - 乙卯
+  - 丙辰
+  - 丁巳
+  - 戊午
+  - 己未
+  - 庚申
+  - 辛酉
+  - 壬戌
+  - 癸亥
+
+# Anchor: 4 AD = 甲子 (per 中國天文年曆 convention).
+# A given CE year N maps to ganzhi_cycle[(N - 4) mod 60].
+ganzhi_anchor_year: 4
+
+dynasties:
+
+  - name: 隋
+    years: [581, 618]
+    eras:
+      - era_name: 大業
+        emperor: 煬帝
+        start_year: 605
+        end_year: 618
+
+  - name: 唐
+    years: [618, 907]
+    eras:
+      - era_name: 武德
+        emperor: 高祖
+        start_year: 618
+        end_year: 626
+      - era_name: 貞觀
+        emperor: 太宗
+        start_year: 627
+        end_year: 649
+      - era_name: 永徽
+        emperor: 高宗
+        start_year: 650
+        end_year: 655
+      - era_name: 顯慶
+        emperor: 高宗
+        start_year: 656
+        end_year: 661
+      - era_name: 龍朔
+        emperor: 高宗
+        start_year: 661
+        end_year: 663
+      - era_name: 麟德
+        emperor: 高宗
+        start_year: 664
+        end_year: 665
+      - era_name: 乾封
+        emperor: 高宗
+        start_year: 666
+        end_year: 668
+      - era_name: 總章
+        emperor: 高宗
+        start_year: 668
+        end_year: 670
+      - era_name: 咸亨
+        emperor: 高宗
+        start_year: 670
+        end_year: 674
+      - era_name: 上元
+        emperor: 高宗
+        start_year: 674
+        end_year: 676
+      - era_name: 儀鳳
+        emperor: 高宗
+        start_year: 676
+        end_year: 679
+      - era_name: 調露
+        emperor: 高宗
+        start_year: 679
+        end_year: 680
+      - era_name: 永隆
+        emperor: 高宗
+        start_year: 680
+        end_year: 681
+      - era_name: 開耀
+        emperor: 高宗
+        start_year: 681
+        end_year: 682
+      - era_name: 永淳
+        emperor: 高宗
+        start_year: 682
+        end_year: 683
+      - era_name: 弘道
+        emperor: 高宗
+        start_year: 683
+        end_year: 683
+      - era_name: 嗣聖
+        emperor: 中宗
+        start_year: 684
+        end_year: 684
+      - era_name: 文明
+        emperor: 睿宗
+        start_year: 684
+        end_year: 684
+      - era_name: 光宅
+        emperor: 武則天
+        start_year: 684
+        end_year: 684
+      - era_name: 垂拱
+        emperor: 武則天
+        start_year: 685
+        end_year: 688
+      - era_name: 永昌
+        emperor: 武則天
+        start_year: 689
+        end_year: 689
+      - era_name: 載初
+        emperor: 武則天
+        start_year: 689
+        end_year: 690
+      - era_name: 天授
+        emperor: 武則天
+        start_year: 690
+        end_year: 692
+      - era_name: 如意
+        emperor: 武則天
+        start_year: 692
+        end_year: 692
+      - era_name: 長壽
+        emperor: 武則天
+        start_year: 692
+        end_year: 694
+      - era_name: 延載
+        emperor: 武則天
+        start_year: 694
+        end_year: 694
+      - era_name: 證聖
+        emperor: 武則天
+        start_year: 695
+        end_year: 695
+      - era_name: 天冊萬歲
+        emperor: 武則天
+        start_year: 695
+        end_year: 696
+      - era_name: 萬歲登封
+        emperor: 武則天
+        start_year: 696
+        end_year: 696
+      - era_name: 萬歲通天
+        emperor: 武則天
+        start_year: 696
+        end_year: 697
+      - era_name: 神功
+        emperor: 武則天
+        start_year: 697
+        end_year: 697
+      - era_name: 聖曆
+        emperor: 武則天
+        start_year: 698
+        end_year: 700
+      - era_name: 久視
+        emperor: 武則天
+        start_year: 700
+        end_year: 701
+      - era_name: 大足
+        emperor: 武則天
+        start_year: 701
+        end_year: 701
+      - era_name: 長安
+        emperor: 武則天
+        start_year: 701
+        end_year: 705
+      - era_name: 神龍
+        emperor: 中宗
+        start_year: 705
+        end_year: 707
+      - era_name: 景龍
+        emperor: 中宗
+        start_year: 707
+        end_year: 710
+      - era_name: 唐隆
+        emperor: 殤帝
+        start_year: 710
+        end_year: 710
+      - era_name: 景雲
+        emperor: 睿宗
+        start_year: 710
+        end_year: 712
+      - era_name: 太極
+        emperor: 睿宗
+        start_year: 712
+        end_year: 712
+      - era_name: 延和
+        emperor: 睿宗
+        start_year: 712
+        end_year: 712
+      - era_name: 先天
+        emperor: 玄宗
+        start_year: 712
+        end_year: 713
+      - era_name: 開元
+        emperor: 玄宗
+        start_year: 713
+        end_year: 741
+      - era_name: 天寶
+        emperor: 玄宗
+        start_year: 742
+        end_year: 756
+      - era_name: 至德
+        emperor: 肅宗
+        start_year: 756
+        end_year: 758
+      - era_name: 乾元
+        emperor: 肅宗
+        start_year: 758
+        end_year: 760
+      - era_name: 上元
+        emperor: 肅宗
+        start_year: 760
+        end_year: 761
+        notes: 重名 (與高宗 上元 相區別); 上下文必要.
+      - era_name: 寶應
+        emperor: 肅宗
+        start_year: 762
+        end_year: 763
+      - era_name: 廣德
+        emperor: 代宗
+        start_year: 763
+        end_year: 764
+      - era_name: 永泰
+        emperor: 代宗
+        start_year: 765
+        end_year: 766
+      - era_name: 大曆
+        emperor: 代宗
+        start_year: 766
+        end_year: 779
+      - era_name: 建中
+        emperor: 德宗
+        start_year: 780
+        end_year: 783
+      - era_name: 興元
+        emperor: 德宗
+        start_year: 784
+        end_year: 784
+      - era_name: 貞元
+        emperor: 德宗
+        start_year: 785
+        end_year: 805
+      - era_name: 永貞
+        emperor: 順宗
+        start_year: 805
+        end_year: 805
+      - era_name: 元和
+        emperor: 憲宗
+        start_year: 806
+        end_year: 820
+      - era_name: 長慶
+        emperor: 穆宗
+        start_year: 821
+        end_year: 824
+      - era_name: 寶曆
+        emperor: 敬宗
+        start_year: 825
+        end_year: 827
+      - era_name: 大和
+        emperor: 文宗
+        start_year: 827
+        end_year: 835
+        notes: 也作 "太和".
+      - era_name: 開成
+        emperor: 文宗
+        start_year: 836
+        end_year: 840
+      - era_name: 會昌
+        emperor: 武宗
+        start_year: 841
+        end_year: 846
+      - era_name: 大中
+        emperor: 宣宗
+        start_year: 847
+        end_year: 860
+      - era_name: 咸通
+        emperor: 懿宗
+        start_year: 860
+        end_year: 874
+      - era_name: 乾符
+        emperor: 僖宗
+        start_year: 874
+        end_year: 879
+      - era_name: 廣明
+        emperor: 僖宗
+        start_year: 880
+        end_year: 881
+      - era_name: 中和
+        emperor: 僖宗
+        start_year: 881
+        end_year: 885
+      - era_name: 光啟
+        emperor: 僖宗
+        start_year: 885
+        end_year: 888
+      - era_name: 文德
+        emperor: 僖宗
+        start_year: 888
+        end_year: 888
+      - era_name: 龍紀
+        emperor: 昭宗
+        start_year: 889
+        end_year: 889
+      - era_name: 大順
+        emperor: 昭宗
+        start_year: 890
+        end_year: 891
+      - era_name: 景福
+        emperor: 昭宗
+        start_year: 892
+        end_year: 893
+      - era_name: 乾寧
+        emperor: 昭宗
+        start_year: 894
+        end_year: 898
+      - era_name: 光化
+        emperor: 昭宗
+        start_year: 898
+        end_year: 901
+      - era_name: 天復
+        emperor: 昭宗
+        start_year: 901
+        end_year: 904
+      - era_name: 天祐
+        emperor: 昭宗
+        start_year: 904
+        end_year: 907
+
+  - name: 北宋
+    years: [960, 1127]
+    eras:
+      - era_name: 建隆
+        emperor: 太祖
+        start_year: 960
+        end_year: 963
+      - era_name: 乾德
+        emperor: 太祖
+        start_year: 963
+        end_year: 968
+      - era_name: 開寶
+        emperor: 太祖
+        start_year: 968
+        end_year: 976
+      - era_name: 太平興國
+        emperor: 太宗
+        start_year: 976
+        end_year: 984
+      - era_name: 雍熙
+        emperor: 太宗
+        start_year: 984
+        end_year: 987
+      - era_name: 端拱
+        emperor: 太宗
+        start_year: 988
+        end_year: 989
+      - era_name: 淳化
+        emperor: 太宗
+        start_year: 990
+        end_year: 994
+      - era_name: 至道
+        emperor: 太宗
+        start_year: 995
+        end_year: 997

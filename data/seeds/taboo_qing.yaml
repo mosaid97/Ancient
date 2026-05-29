@@ -1,0 +1,76 @@
+# 清朝 避諱 stub seed table.
+# Source: 史諱舉例 + 中國歷代避諱字表.
+# v1 corpus is Tang; Qing is a stub. Qing taboo was very strict (especially
+# under 雍正/乾隆), so a fuller seed is desirable for any Qing-edition
+# secondary references. Expand in Phase 11.
+dynasty: 清
+years: [1644, 1912]
+notes: |
+  Stub seed — focuses on the most-cited Qing emperors whose 諱字 entered
+  printed-edition standard practice.
+
+emperors:
+  - posthumous: 聖祖
+    given: 愛新覺羅·玄燁
+    reign: [1661, 1722]
+    taboo:
+      - original: 玄
+        substitutions: [元]
+        scope: char
+        safe: true
+        notes: 康熙朝起 玄 → 元 廣行; 嚴格.
+      - original: 燁
+        substitutions: [煜]
+        scope: char
+        safe: true
+  - posthumous: 世宗
+    given: 愛新覺羅·胤禛
+    reign: [1722, 1735]
+    taboo:
+      - original: 胤
+        substitutions: [允]
+        scope: char
+        safe: true
+        notes: 雍正朝兄弟皆改 胤 -> 允.
+      - original: 禛
+        substitutions: [真]
+        scope: char
+        safe: true
+  - posthumous: 高宗
+    given: 愛新覺羅·弘曆
+    reign: [1735, 1796]
+    taboo:
+      - original: 弘
+        substitutions: [宏]
+        scope: char
+        safe: true
+        notes: 乾隆朝 嚴格避諱 弘 -> 宏.
+      - original: 曆
+        substitutions: [歷]
+        scope: char
+        safe: false
+        notes: 曆/歷 modern often conflated.
+  - posthumous: 仁宗
+    given: 愛新覺羅·顒琰
+    reign: [1796, 1820]
+    taboo:
+      - original: 顒
+        substitutions: []
+        scope: char
+        safe: true
+      - original: 琰
+        substitutions: []
+        scope: char
+        safe: true
+  - posthumous: 宣宗
+    given: 愛新覺羅·旻寧
+    reign: [1820, 1850]
+    taboo:
+      - original: 旻
+        substitutions: []
+        scope: char
+        safe: true
+      - original: 寧
+        substitutions: [寕, 甯]
+        scope: char
+        safe: true

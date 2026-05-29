@@ -1,0 +1,35 @@
+[project]
+name = "ancient-china"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4>=4.14.3",
+    "ebooklib>=0.20",
+    "fugashi>=1.5.2",
+    "httpx>=0.28.1",
+    "ipykernel>=7.2.0",
+    "jieba>=0.42.1",
+    "jupyter>=1.1.1",
+    "lxml>=6.1.0",
+    "minio>=7.2.20",
+    "mojimoji>=0.0.13",
+    "neo4j>=6.2.0",
+    "numpy>=2.4.5",
+    "openai>=2.36.0",
+    "opencc-python-reimplemented>=0.1.7",
+    "opencv-python-headless>=4.13.0.92",
+    "paddleocr>=2.10.0",
+    "paddlepaddle>=3.3.1",
+    "pillow>=12.2.0",
+    "pymupdf>=1.27.2.3",
+    "python-dotenv>=1.2.2",
+    "pyyaml>=6.0.3",
+    "unidic-lite>=1.0.8",
+]
+
+[dependency-groups]
+dev = [
+    "matplotlib>=3.10.9",
+]

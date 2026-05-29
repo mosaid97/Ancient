@@ -1,0 +1,68 @@
+# 異體字 (variant character) seed map.
+# Format: variant<TAB>canonical<TAB>source<TAB>notes
+# - "variant" is the form sometimes seen in classical-Chinese sources.
+# - "canonical" is the modern unified form to canonicalize toward.
+# - Direction is one-way (variant -> canonical). For bidirectional search,
+#   the loader builds an equivalence-class union.
+# - Source codes: "Unihan-kCV" (kCompatibilityVariant), "Unihan-kSV"
+#   (kSemanticVariant), "MOE-Variants" (教育部異體字字典 derived), "manual".
+# - This is a seed; Phase 11 HITL grows it. Full Unihan ingest is tracked in
+#   scripts/seed_variants.py (TODO).
+#
+# Common classical-Chinese variants (~50 hand-curated rows).
+variant	canonical	source	notes
+爲	為	Unihan-kCV	classical "to do/be"; modern unified form
+眾	众	Unihan-kSV	"crowd"
+眾	衆	Unihan-kCV	traditional alt
+衆	眾	Unihan-kCV	bi-direction: prefer 眾
+著	着	Unihan-kCV	classical "to wear/attach"
+卻	却	Unihan-kCV	"however/retreat"
+麽	么	Unihan-kCV	suffix particle (modern)
+麼	么	Unihan-kCV	classical interrogative
+裡	裏	Unihan-kCV	"inside" — inner-form variant
+裏	裡	Unihan-kCV	bi-direction
+群	羣	Unihan-kCV	"flock/group"
+羣	群	Unihan-kCV	bi-direction
+峰	峯	Unihan-kCV	"peak"
+峯	峰	Unihan-kCV	bi-direction
+床	牀	Unihan-kCV	"bed"
+牀	床	Unihan-kCV	bi-direction
+笔	筆	Unihan-kSV	"brush/pen"; simplification pair
+回	囘	manual	classical alt of "return"
+氷	冰	Unihan-kCV	"ice" (also Japanese)
+凉	涼	Unihan-kCV	"cool"
+洒	灑	Unihan-kCV	"sprinkle"
+匈	胸	manual	classical "chest" (匈奴 is unrelated)
+廼	乃	Unihan-kCV	"thereupon"
+迺	乃	Unihan-kCV	classical "thereupon"
+旡	無	manual	rare classical "not"
+無	无	Unihan-kSV	"none/without" (simplification pair)
+万	萬	Unihan-kSV	"ten thousand"
+従	從	Unihan-kCV	classical "to follow"
+從	从	Unihan-kSV	"from/follow"
+礼	禮	Unihan-kSV	"rite/ritual"
+体	體	Unihan-kSV	"body"
+学	學	Unihan-kSV	"to learn"
+说	說	Unihan-kSV	"to say"
+为	為	Unihan-kSV	simplified-traditional pair
+帝	帝	manual	intentional duplicate to verify NFC idempotence
+皆	皆	manual	intentional duplicate (NFC sanity check)
+吗	嗎	Unihan-kSV	interrogative particle
+门	門	Unihan-kSV	"gate"
+里	裏	Unihan-kCV	measure unit / inside (context-dependent)
+里	裡	Unihan-kCV	context-dependent
+歲	岁	Unihan-kSV	"year of age"
+歳	歲	Unihan-kCV	Japanese-form variant
+舉	举	Unihan-kSV	"to lift/cite"
+擧	舉	Unihan-kCV	classical alt
+擧	举	Unihan-kSV	via 舉 -> 举
+書	书	Unihan-kSV	"book/letter"
+證	证	Unihan-kSV	"to prove"
+証	證	Unihan-kCV	classical alt
+辭	辞	Unihan-kSV	"speech/words"
+辞	辭	Unihan-kCV	bi-direction
+歩	步	Unihan-kCV	Japanese-form "step"
+讓	让	Unihan-kSV	"to yield"
+讓	譲	Unihan-kCV	Japanese-form variant
+譲	讓	Unihan-kCV	bi-direction
+譲	让	Unihan-kSV	via 讓 -> 让

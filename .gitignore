@@ -1,0 +1,45 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Environment variables
+.env
+
+# Raw corpus (large binary files — not redistributable)
+raw/
+
+# Data blobs (keep data/seeds/ and data/bench/ — exclude large binary dumps)
+data/blobs/
+data/paddle_corpus/
+
+# Notebook artifacts (generated outputs, not source)
+notebooks/_artifacts/
+
+# Logs (generated at runtime — keep the placeholder, ignore everything else)
+logs/*
+!logs/.gitkeep
+
+# Graphify knowledge-graph outputs (generated, not source)
+graphify-out/
+
+# macOS
+.DS_Store
+
+# Docker volumes (Neo4j, MinIO)
+neo4j_data/
+neo4j_logs/
+neo4j_import/
+minio_data/
+
+# IDE
+.cursor/settings.json
+.idea/
+*.swp
+*.swo

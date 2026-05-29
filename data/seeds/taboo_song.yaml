@@ -1,0 +1,52 @@
+# 宋朝 避諱 stub seed table.
+# Source: 史諱舉例 + 中國歷代避諱字表.
+# v1 corpus is Tang; Song is a stub for completeness. Expand in Phase 11.
+dynasty: 宋
+years: [960, 1279]
+notes: |
+  Stub seed — only the 4 most-cited 北宋 emperors. Apply when
+  Document.publicationPeriod ∈ Song.
+
+emperors:
+  - posthumous: 太祖
+    given: 趙匡胤
+    reign: [960, 976]
+    taboo:
+      - original: 匡
+        substitutions: [正, 康]
+        scope: char
+        safe: true
+      - original: 胤
+        substitutions: [嗣, 允]
+        scope: char
+        safe: true
+  - posthumous: 太宗
+    given: 趙光義
+    reign: [976, 997]
+    taboo:
+      - original: 光
+        substitutions: []
+        scope: char
+        safe: false
+        notes: 光 過於高頻; 通常 only avoided in 諡號 / 廟號 contexts.
+      - original: 義
+        substitutions: []
+        scope: char
+        safe: false
+        notes: 義 過於高頻; opt-in only.
+  - posthumous: 真宗
+    given: 趙恆
+    reign: [997, 1022]
+    taboo:
+      - original: 恆
+        substitutions: [常]
+        scope: char
+        safe: false
+  - posthumous: 仁宗
+    given: 趙禎
+    reign: [1022, 1063]
+    taboo:
+      - original: 禎
+        substitutions: [貞]
+        scope: char
+        safe: true

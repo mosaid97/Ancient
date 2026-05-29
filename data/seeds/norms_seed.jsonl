@@ -1,0 +1,31 @@
+{"rule": "「之」作為結構助詞時譯為「的」，作為代詞時按上下文譯為「他」「她」「它」", "scope": "structural_particle", "tradition": "zh-classical"}
+{"rule": "「於」作介詞表地點時譯為「在」，表時間譯為「在……時」，表對象譯為「對於」", "scope": "preposition", "tradition": "zh-classical"}
+{"rule": "「以」作介詞表工具譯為「用」「以」，表原因譯為「因為」，表方式譯為「按照」", "scope": "preposition", "tradition": "zh-classical"}
+{"rule": "「而」表順承時直譯「然後」，表轉折時譯為「但是」「卻」，表並列可省略", "scope": "conjunction", "tradition": "zh-classical"}
+{"rule": "「乃」作副詞表順承譯「於是」「就」，表意外語氣譯「竟然」「反而」", "scope": "adverb", "tradition": "zh-classical"}
+{"rule": "「其」用作代詞一律按上下文譯出所指，不直譯「其」字；用作語氣詞表揣測可譯「大概」", "scope": "pronoun", "tradition": "zh-classical"}
+{"rule": "「則」表條件結果時譯為「那麼」「就」，表對比時可保留「則」或譯「而」", "scope": "conjunction", "tradition": "zh-classical"}
+{"rule": "「者」用於名詞化時加「……的人/事/物」，用於判斷句結構時依語境選擇是否保留", "scope": "nominalizer", "tradition": "zh-classical"}
+{"rule": "「也」「矣」「焉」等語氣詞通常在白話中省略，必要時用「啊」「了」「呢」替換", "scope": "modal_particle", "tradition": "zh-classical"}
+{"rule": "「曰」表示引語時換用冒號加引號，不直譯「說道」除非需要強調說話動作", "scope": "quotation_verb", "tradition": "zh-classical"}
+{"rule": "「謂」作動詞「認為/叫做」；作介詞「對……說」；注意與「曰」的語境區別", "scope": "polysemy", "tradition": "zh-classical"}
+{"rule": "數字後的量詞「人」「日」「年」「里」直譯，無量詞的數字後補充現代量詞", "scope": "numerals", "tradition": "zh-classical"}
+{"rule": "官職名稱保留原文並在括號內附簡要解釋，如「吏部（主管文官銓選）」", "scope": "official_titles", "tradition": "zh-classical"}
+{"rule": "年號加上「年間」或具體年份，如「貞觀年間（627-649年）」便於讀者定位", "scope": "era_names", "tradition": "zh-classical"}
+{"rule": "律文「笞/杖/徒/流/死」五刑名稱直譯，括號內注明刑度，如「杖一百（棍打百下）」", "scope": "legal_terms", "tradition": "zh-classical"}
+{"rule": "「十惡」罪名直譯並保留傳統順序（謀反、謀大逆、謀叛、惡逆、不道、大不敬、不孝、不睦、不義、內亂）", "scope": "legal_terms", "tradition": "zh-classical"}
+{"rule": "疏議體例「律文」+「疏曰」結構：疏文為官方權威解釋，翻譯時在白話前加注「官方解釋：」", "scope": "document_structure", "tradition": "zh-classical"}
+{"rule": "連用同義詞如「罰沒入官」保留兩字，合譯為「沒收充公」", "scope": "doublets", "tradition": "zh-classical"}
+{"rule": "避諱字（避皇帝名諱的替換字）翻譯時還原本字並在括號內注明避諱，如「民（避太宗諱，原字「民」）」", "scope": "taboo_substitution", "tradition": "zh-classical"}
+{"rule": "通假字（借音假借）翻譯時換用本字並在括號內注通假，如「說（通「悅」）」", "scope": "loan_characters", "tradition": "zh-classical"}
+{"rule": "異體字統一換用標準繁體字，不保留異體（如「𨭏」換用「鐵」）", "scope": "variant_characters", "tradition": "zh-classical"}
+{"rule": "返り点（レ点・一二三点）指示日本式漢文返讀順序，翻譯時按返讀後的語序譯成現代日語", "scope": "kundoku_order", "tradition": "kanbun-kundoku"}
+{"rule": "送り仮名（漢字旁的假名）是動詞活用語尾或助詞，翻譯時按現代日語語法接活用", "scope": "okurigana", "tradition": "kanbun-kundoku"}
+{"rule": "訓読で「者」は「もの」または「は」（主題提示）、文脈で判断する", "scope": "particle_sha", "tradition": "kanbun-kundoku"}
+{"rule": "訓読で「也」「矣」などの助字は省略するか「なり」「けり」に対応させる", "scope": "modal_particle", "tradition": "kanbun-kundoku"}
+{"rule": "敦煌文書の略字・俗字は正字に還元してから翻訳する", "scope": "dunhuang_variant", "tradition": "zh-classical"}
+{"rule": "二十四史列伝の人名・地名は首出のみ括弧内に現代読みを付す", "scope": "proper_names", "tradition": "shared"}
+{"rule": "「詔曰」で始まる勅書体は翻訳後も文語調を保ち口語化しすぎない", "scope": "imperial_edict_register", "tradition": "zh-classical"}
+{"rule": "Classical particle 也 at end of nominal clause signals equative judgment; translate as 「是」 in modern Chinese", "scope": "equative_particle", "tradition": "zh-classical"}
+{"rule": "When 有 precedes a verbal phrase, treat as existential 'there is/are', not the possessive 'have'", "scope": "existential_you", "tradition": "zh-classical"}
+{"rule": "Passive voice in classical Chinese: 「見/為/被 + V」; translate with passive 「被……」 in modern Chinese", "scope": "passive_construction", "tradition": "zh-classical"}

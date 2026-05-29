@@ -1,0 +1,43 @@
+# 通假字 (phonetic loan / interchangeable characters) seed map.
+# Source: 古代漢語通假字大字典 (manually curated seed; ~30 most-common pairs).
+# Format: a<TAB>b<TAB>direction<TAB>context<TAB>notes
+# - "direction" is one of:
+#     "bi"  — symmetric (a <-> b in classical use).
+#     "a>b" — a was used FOR b (canonical = b).
+#     "b>a" — opposite.
+# - "context" describes when the loan applied (e.g. "verb-only").
+# - This map is OFF by default in the verifier (plan §2.7) — over-normalization
+#   risk. Translator uses it always; verifier turns it on only when query
+#   carries `loose=true`.
+a	b	direction	context	notes
+早	蚤	bi	時間/動物	"early" vs "flea"; classical interchange
+反	返	a>b	動詞	"to return"; modern uses 返
+知	智	bi	名詞/形容詞	"knowledge/wisdom"
+信	伸	a>b	動詞	classical "to extend"
+說	悅	a>b	形容詞	"pleased"; e.g. 學而時習之不亦說乎
+女	汝	a>b	代詞	classical second-person pronoun
+無	毋	bi	否定	negation particle
+亡	無	a>b	否定	"there is no"
+弟	悌	a>b	形容詞	"respectful to elder brother"
+卒	猝	a>b	副詞	"suddenly"
+畔	叛	a>b	動詞	"to rebel"
+惠	慧	a>b	形容詞	classical "wise"
+歸	饋	a>b	動詞	"to give a gift"
+乎	於	bi	介詞	preposition (loc/temporal)
+焉	於	a>b	介詞	classical preposition
+而	爾	a>b	代詞	classical second-person pronoun
+莫	暮	a>b	名詞	"evening"; original meaning of 莫
+舍	捨	a>b	動詞	"to abandon"
+直	值	a>b	動詞	"to be worth"
+尊	樽	a>b	名詞	"wine vessel"
+止	趾	a>b	名詞	"foot"
+要	邀	a>b	動詞	"to invite"
+共	供	a>b	動詞	"to provide"
+共	恭	a>b	形容詞	"respectful"
+責	債	a>b	名詞	"debt"
+亦	奕	a>b	形容詞	rare classical
+辟	避	a>b	動詞	"to avoid"; e.g. 辟易
+辟	闢	a>b	動詞	"to open up"; multi-direction loan
+辟	僻	a>b	形容詞	"remote"
+從	縱	a>b	副詞	"vertical/from"
+與	歟	a>b	語氣	question particle

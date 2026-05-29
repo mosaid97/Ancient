@@ -1,0 +1,43 @@
+# 明朝 避諱 stub seed table.
+# Source: 史諱舉例 + 中國歷代避諱字表.
+# v1 corpus is Tang; Ming is a stub. Expand in Phase 11.
+dynasty: 明
+years: [1368, 1644]
+notes: |
+  Stub seed — Ming dynasty practiced relatively lighter taboo than Tang/Qing.
+  Only top-3 most-cited emperors here.
+
+emperors:
+  - posthumous: 太祖
+    given: 朱元璋
+    reign: [1368, 1398]
+    taboo:
+      - original: 元
+        substitutions: []
+        scope: char
+        safe: false
+        notes: 元 過於高頻; not generally avoided.
+      - original: 璋
+        substitutions: [章]
+        scope: char
+        safe: true
+  - posthumous: 成祖
+    given: 朱棣
+    reign: [1402, 1424]
+    taboo:
+      - original: 棣
+        substitutions: [弟]
+        scope: char
+        safe: true
+  - posthumous: 神宗
+    given: 朱翊鈞
+    reign: [1572, 1620]
+    taboo:
+      - original: 翊
+        substitutions: [輔]
+        scope: char
+        safe: true
+      - original: 鈞
+        substitutions: [均]
+        scope: char
+        safe: true

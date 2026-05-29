@@ -1,0 +1,177 @@
+# 唐朝 避諱 (Tang dynasty taboo) seed table.
+#
+# Source: 史諱舉例 (陳垣) + 中國歷代避諱字表 (manually curated seed).
+# Apply only when Document.publicationPeriod or Page.detectedEra ∈ Tang.
+# This is the highest-priority dynasty for v1 because the project corpus is
+# Tang-era primaries. Other dynasties have stub tables; expand in Phase 11.
+#
+# Semantics of the substitution map:
+#   During the Tang, scribes wrote `substitution` INSTEAD of `original`.
+#   To make the verifier match, the canonical pipeline rewrites
+#   `substitution -> original` ONLY when the document's era is Tang.
+#   Verifier-search expansion can also walk the reverse map.
+#
+# Caveat: substitution characters are sometimes ordinary Chinese words.
+# Naive bulk replacement would corrupt unrelated text. The taboo normalizer
+# (apps/backend/normalize/taboo.py) only applies these rules when explicitly
+# enabled per document, and a `safe_only` flag keeps high-collision pairs
+# (e.g. 代->世) opt-in. Defaults are conservative.
+
+dynasty: 唐
+years: [618, 907]
+notes: |
+  公諱 only (personal taboo of reigning emperor).
+  廟諱 (posthumous taboo) and 偏旁諱 (radical-level taboo) deferred to a
+  follow-up seed expansion.
+
+emperors:
+  - posthumous: 高祖
+    given: 李淵
+    reign: [618, 626]
+    taboo:
+      - original: 淵
+        substitutions: [泉]
+        scope: char
+        safe: true
+        notes: 嚴格避諱; 泉 substitute is the canonical Tang scribal choice.
+      - original: 淵
+        substitutions: [深]
+        scope: char
+        safe: false
+        notes: 深 高頻 (general "deep") — opt-in only via taboo_unsafe=True.
+  - posthumous: 太宗
+    given: 李世民
+    reign: [627, 649]
+    taboo:
+      - original: 世
+        substitutions: [代, 系]
+        scope: char
+        safe: false
+        notes: 高頻字 — 默認 opt-in only; 代/系 modern usage 沖突嚴重.
+      - original: 民
+        substitutions: [人]
+        scope: char
+        safe: false
+        notes: 高頻字 — 同上.
+  - posthumous: 高宗
+    given: 李治
+    reign: [650, 683]
+    taboo:
+      - original: 治
+        substitutions: [理, 持]
+        scope: char
+        safe: false
+        notes: 唐初常見.
+  - posthumous: 中宗
+    given: 李顯
+    reign: [684, 710]
+    taboo:
+      - original: 顯
+        substitutions: [明]
+        scope: char
+        safe: false
+  - posthumous: 睿宗
+    given: 李旦
+    reign: [684, 712]
+    taboo:
+      - original: 旦
+        substitutions: []
+        scope: char
+        safe: true
+        notes: 避諱不嚴 — 通常不替換.
+  - posthumous: 玄宗
+    given: 李隆基
+    reign: [713, 756]
+    taboo:
+      - original: 隆
+        substitutions: [崇, 興]
+        scope: char
+        safe: true
+      - original: 基
+        substitutions: [根, 業]
+        scope: char
+        safe: false
+        notes: 基 高頻; 默認 opt-in.
+  - posthumous: 肅宗
+    given: 李亨
+    reign: [756, 762]
+    taboo:
+      - original: 亨
+        substitutions: [通]
+        scope: char
+        safe: true
+  - posthumous: 代宗
+    given: 李豫
+    reign: [762, 779]
+    taboo:
+      - original: 豫
+        substitutions: [預, 悅]
+        scope: char
+        safe: true
+  - posthumous: 德宗
+    given: 李适
+    reign: [779, 805]
+    taboo:
+      - original: 适
+        substitutions: [達]
+        scope: char
+        safe: true
+        notes: 适 罕用; 同音 適 偶被避.
+  - posthumous: 順宗
+    given: 李誦
+    reign: [805, 805]
+    taboo:
+      - original: 誦
+        substitutions: [諷]
+        scope: char
+        safe: true
+  - posthumous: 憲宗
+    given: 李純
+    reign: [806, 820]
+    taboo:
+      - original: 純
+        substitutions: [淳]
+        scope: char
+        safe: true
+  - posthumous: 穆宗
+    given: 李恆
+    reign: [820, 824]
+    taboo:
+      - original: 恆
+        substitutions: [常]
+        scope: char
+        safe: false
+        notes: 常 高頻; opt-in.
+  - posthumous: 敬宗
+    given: 李湛
+    reign: [824, 826]
+    taboo:
+      - original: 湛
+        substitutions: [沈, 沉]
+        scope: char
+        safe: true
+  - posthumous: 文宗
+    given: 李昂
+    reign: [827, 840]
+    taboo:
+      - original: 昂
+        substitutions: [仰]
+        scope: char
+        safe: true
+  - posthumous: 武宗
+    given: 李炎
+    reign: [840, 846]
+    taboo:
+      - original: 炎
+        substitutions: []
+        scope: char
+        safe: true
+        notes: 武宗時避諱漸鬆 — 通常不替換.
+  - posthumous: 宣宗
+    given: 李忱
+    reign: [846, 859]
+    taboo:
+      - original: 忱
+        substitutions: [沉]
+        scope: char
+        safe: true

@@ -1,0 +1,224 @@
+# Problem Class Taxonomy — Phase 4 Evaluator
+#
+# Used by apps/backend/agents/problem_classifier.py for routing OCR pages.
+# Decision rules (per plan §6 Stage 4):
+#   CER < 5%  AND class = OK                                → PASS
+#   CER 5–15% OR  class in review_classes                   → NEEDS_REVIEW
+#   CER ≥ 15% OR  class in failed_classes                   → FAILED
+#   class in polysemy_classes                               → PASS (Translation Agent owns)
+#   JP classes                                              → NEEDS_REVIEW
+#
+# Each entry: code, label (zh), description, routing, few_shot examples
+# few_shot: list of {context, paddle_excerpt, fused_excerpt, class, reasoning}
+
+routing:
+  pass_classes:
+    - OK
+    - POLYSEMY
+    - CULTURAL_REFERENCE
+  review_classes:
+    - LAYOUT_AMBIGUITY
+    - READING_ORDER
+    - ANNOTATION
+    - EDITORIAL_VS_SOURCE
+    - KANBUN_KUNTEN
+    - OKURIGANA
+    - HENTAIGANA
+    - MIXED_SCRIPT
+  failed_classes:
+    - RARE_GLYPH
+    - DEGRADATION
+
+classes:
+  # ── zh classes ──────────────────────────────────────────────────────────
+
+  - code: OK
+    label: "無問題"
+    description: "OCR結果一致，文本清晰，無需複查。"
+    language: zh
+    routing: pass
+
+  - code: RARE_GLYPH
+    label: "罕見字形"
+    description: >
+      頁面包含非Unicode標準範圍的罕見古字、異體字，或字形損壞導致OCR無法識別。
+      引擎之間出現大量字符差異，且差異集中在特定古字上。
+    language: zh
+    routing: failed
+    few_shots:
+      - context: "唐律疏議箋解，卷一，刑名"
+        paddle_excerpt: "□□□之罪"
+        fused_excerpt: "謀叛□之罪"
+        class: RARE_GLYPH
+        reasoning: "paddle未能識別古字字形，fused版本仍有缺字，屬罕見字形問題"
+      - context: "舊唐書，卷一百八十五"
+        paddle_excerpt: "以𥢶代之"
+        fused_excerpt: "以□代之"
+        class: RARE_GLYPH
+        reasoning: "𥢶為罕見字，兩個引擎均未能正確識別"
+
+  - code: DEGRADATION
+    label: "頁面損壞"
+    description: >
+      物理損壞（蟲蛀、水漬、墨跡脫落）、透印（背面文字透過）或印刷模糊
+      導致大量字符無法識別，且損壞分布廣泛（非單個字符）。
+    language: zh
+    routing: failed
+    few_shots:
+      - context: "敦煌吐魯番文書，第3輯"
+        paddle_excerpt: "□□□□□□□□"
+        fused_excerpt: ""
+        class: DEGRADATION
+        reasoning: "連續多個字符缺失，且fused結果為空，判定為頁面損壞"
+      - context: "唐令拾遺，某卷"
+        paddle_excerpt: "臣謹按■■■■疏議曰"
+        fused_excerpt: "臣謹按████疏議曰"
+        class: DEGRADATION
+        reasoning: "出現大段方塊符號，屬物理損壞導致的識別失敗"
+
+  - code: LAYOUT_AMBIGUITY
+    label: "版式歧義"
+    description: >
+      雙欄排版、多欄注釋、旁注、天頭地腳夾雜正文，導致OCR讀取順序混亂，
+      但字符本身清晰可辨。
+    language: zh
+    routing: needs_review
+    few_shots:
+      - context: "唐律疏議箋解，律文+注文雙欄"
+        paddle_excerpt: "謀反謀大逆及謀叛者注疏議曰謂謀危"
+        fused_excerpt: "謀反謀大逆及謀叛者\n疏議曰謂謀危"
+        class: LAYOUT_AMBIGUITY
+        reasoning: "律文與疏議注文混排，paddle將兩欄合併讀取"
+      - context: "通典，帶眉批版本"
+        paddle_excerpt: "其制度今按此條補前令"
+        fused_excerpt: "其制度\n今按此條補前令"
+        class: LAYOUT_AMBIGUITY
+        reasoning: "正文與眉批混排，讀取順序有歧義"
+
+  - code: READING_ORDER
+    label: "閱讀順序錯誤"
+    description: >
+      引擎按錯誤方向讀取（如從左到右讀取從右到左的欄位，或
+      把頁碼/版心文字插入正文），文字本身可辨，但順序錯誤。
+    language: zh
+    routing: needs_review
+    few_shots:
+      - context: "舊唐書影印本，右欄先讀"
+        paddle_excerpt: "本紀第一高祖世民太宗"
+        fused_excerpt: "太宗世民\n本紀第一高祖"
+        class: READING_ORDER
+        reasoning: "paddle按左欄優先讀取，正確順序應為右欄（較舊）優先"
+
+  - code: ANNOTATION
+    label: "注文與正文混淆"
+    description: >
+      校勘記、箋解、疏議與源文本混在一行，無法清晰區分
+      哪些是原典文字、哪些是注釋文字。
+    language: zh
+    routing: needs_review
+    few_shots:
+      - context: "唐律疏議箋解，律文後附箋"
+        paddle_excerpt: "□坐之謂同罪也劉俊文按此條見令"
+        fused_excerpt: "□坐之謂同罪也【劉俊文按：此條見令】"
+        class: ANNOTATION
+        reasoning: "校注人名（劉俊文）與律文本文混排，未能區分正文與箋注"
+
+  - code: POLYSEMY
+    label: "多義字歧義"
+    description: >
+      字符識別正確，但存在古漢語多義詞或一字多讀，需結合上下文語境
+      確定確切含義，由翻譯代理（Phase 6）處理。
+    language: zh
+    routing: pass
+    few_shots:
+      - context: "唐律，有司條"
+        paddle_excerpt: "有司奏請"
+        fused_excerpt: "有司奏請"
+        class: POLYSEMY
+        reasoning: "「有司」在不同語境指不同官職，屬語義歧義，文字識別正確"
+
+  - code: CULTURAL_REFERENCE
+    label: "文化典故"
+    description: >
+      涉及典故、制度名稱、地名官職等文化背景知識，字符識別正確，
+      但理解需要專業知識，由翻譯代理（Phase 6）處理。
+    language: zh
+    routing: pass
+    few_shots:
+      - context: "舊唐書，職官志"
+        paddle_excerpt: "詔以三公九卿議之"
+        fused_excerpt: "詔以三公九卿議之"
+        class: CULTURAL_REFERENCE
+        reasoning: "三公九卿為唐代官制名稱，文字識別正確，語義理解需文化背景"
+
+  - code: EDITORIAL_VS_SOURCE
+    label: "校注與源文歧義"
+    description: >
+      無法確定某段文字屬於古典源文本還是現代校點注文，
+      尤其常見於「（校注：…）」「【補注】」等形式不統一的情況。
+    language: zh
+    routing: needs_review
+    few_shots:
+      - context: "唐令拾遺，某令條"
+        paddle_excerpt: "此令已佚今從敦煌文書補錄"
+        fused_excerpt: "此令已佚【今從敦煌文書補錄】"
+        class: EDITORIAL_VS_SOURCE
+        reasoning: "不確定補錄說明是原令文還是現代校訂者的注釋"
+
+  # ── JP classes ──────────────────────────────────────────────────────────
+
+  - code: KANBUN_KUNTEN
+    label: "漢文訓點"
+    description: >
+      頁面包含返り点（レ点・一二三点）、送り仮名等漢文訓読符號，
+      OCR引擎將這些符號混入正文或完全忽略，導致文本結構錯誤。
+    language: ja
+    routing: needs_review
+    few_shots:
+      - context: "唐令拾遺補（仁井田陞），漢文訓読形式"
+        paddle_excerpt: "凡官人以上一品者封戸"
+        fused_excerpt: "凡レ官人ニ以ハ一品以上者封戸"
+        class: KANBUN_KUNTEN
+        reasoning: "fused版本保留了返り点（レ）和送り仮名（ニ、ハ），paddle忽略了訓點"
+
+  - code: OKURIGANA
+    label: "送り仮名"
+    description: >
+      日文假名（ひらがな）附在漢字旁作為送り仮名，OCR引擎
+      未能正確識別或將假名誤認為漢字。
+    language: ja
+    routing: needs_review
+    few_shots:
+      - context: "唐令拾遺補，日文解說部分"
+        paddle_excerpt: "定期行われる制度として"
+        fused_excerpt: "定期に行なわれる制度として"
+        class: OKURIGANA
+        reasoning: "送り仮名「に」「なわれる」識別有誤"
+
+  - code: HENTAIGANA
+    label: "變體假名"
+    description: >
+      使用明治以前的舊式假名（变体仮名，hentaigana），
+      這些字符不在現代Unicode標準假名範圍內，OCR引擎無法識別。
+    language: ja
+    routing: needs_review
+    few_shots:
+      - context: "江戶時代刊本"
+        paddle_excerpt: "□□□こと"
+        fused_excerpt: "□□□こと"
+        class: HENTAIGANA
+        reasoning: "文中包含変体仮名字符，兩引擎均無法識別"
+
+  - code: MIXED_SCRIPT
+    label: "中日混排"
+    description: >
+      同一頁面或段落中中文與日文混排（常見於日本學者的唐令研究），
+      OCR引擎在語言切換點產生識別錯誤。
+    language: ja
+    routing: needs_review
+    few_shots:
+      - context: "仁井田陞著唐令拾遺補，中文令文+日文注解"
+        paddle_excerpt: "戸令第一条凡戸以百家為里此条依仁井田氏说"
+        fused_excerpt: "戸令第一条\n凡戸以百家為里\n（此条依仁井田氏說）"
+        class: MIXED_SCRIPT
+        reasoning: "中文令文與日文注解混排，paddle未能區分語言層次"
