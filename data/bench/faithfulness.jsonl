@@ -1,0 +1,10 @@
+{"query_id":"f001","query":"唐律疏議中十惡尤切不容首免的原文","faithful_span":"十惡尤切不容首免","faithful_chunk_id":"","relevant_chunk_ids":[],"labeling_status":"needs_labeling","source_doc":"唐律疏議"}
+{"query_id":"f002","query":"唐律名例律第一條疏議關於五刑的論述","faithful_span":"五刑之中死刑為重","faithful_chunk_id":"","relevant_chunk_ids":[],"labeling_status":"needs_labeling","source_doc":"唐律疏議"}
+{"query_id":"f003","query":"唐律中關於八議的原文條文","faithful_span":"議親議故議賢議能議功議貴議勤議賓","faithful_chunk_id":"","relevant_chunk_ids":[],"labeling_status":"needs_labeling","source_doc":"唐律疏議"}
+{"query_id":"f004","query":"通典中關於科舉考試的記載原文","faithful_span":"進士科始於隋大業中","faithful_chunk_id":"","relevant_chunk_ids":[],"labeling_status":"needs_labeling","source_doc":"通典"}
+{"query_id":"f005","query":"舊唐書玄宗紀中關於開元改元的記載","faithful_span":"開元元年","faithful_chunk_id":"","relevant_chunk_ids":[],"labeling_status":"needs_labeling","source_doc":"舊唐書"}
+{"query_id":"f006","query":"唐律疏議戶婚律關於嫁娶的原文","faithful_span":"諸為婚之法","faithful_chunk_id":"","relevant_chunk_ids":[],"labeling_status":"needs_labeling","source_doc":"唐律疏議"}
+{"query_id":"f007","query":"唐律疏議中關於化外人犯罪的條文","faithful_span":"化外人相犯","faithful_chunk_id":"","relevant_chunk_ids":[],"labeling_status":"needs_labeling","source_doc":"唐律疏議"}
+{"query_id":"f008","query":"唐律中關於謀大逆的定義原文","faithful_span":"謀毀宗廟山陵及宮闕","faithful_chunk_id":"","relevant_chunk_ids":[],"labeling_status":"needs_labeling","source_doc":"唐律疏議"}
+{"query_id":"f009","query":"通典均田制授田標準的原始記載","faithful_span":"丁男給田一頃","faithful_chunk_id":"","relevant_chunk_ids":[],"labeling_status":"needs_labeling","source_doc":"通典"}
+{"query_id":"f010","query":"唐律疏議捕亡律中關於逃亡罪的條文","faithful_span":"諸亡律","faithful_chunk_id":"","relevant_chunk_ids":[],"labeling_status":"needs_labeling","source_doc":"唐律疏議"}
