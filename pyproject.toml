@@ -10,6 +10,7 @@ dependencies = [
     "flagembedding>=1.4.0",
     "fugashi>=1.5.2",
     "httpx>=0.28.1",
+    "igraph>=1.0.0",
     "ipykernel>=7.2.0",
     "jieba>=0.42.1",
     "jupyter>=1.1.1",
