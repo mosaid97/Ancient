@@ -100,15 +100,20 @@ class BM25Corpus:
                     chunk_ids.append(row["chunk_id"])
                     chunk_tiers.append(row.get("tier"))
                     tokenized_corpus.append(tokens)
+                    if max_chunks and len(chunk_ids) >= max_chunks:
+                        break
             skip += len(rows)
             if max_chunks and len(chunk_ids) >= max_chunks:
                 break
 
         log.info("BM25Corpus built: %d chunks indexed", len(chunk_ids))
+        # BM25Okapi raises ZeroDivisionError on empty corpus; use sentinel so
+        # the query() guard (if not self.chunk_ids) handles it cleanly.
+        index_corpus = tokenized_corpus if tokenized_corpus else [["__empty__"]]
         return cls(
             chunk_ids=chunk_ids,
             chunk_tiers=chunk_tiers,
-            index=BM25Okapi(tokenized_corpus),
+            index=BM25Okapi(index_corpus),
         )
 
     def query(self, query_text: str, *, top_k: int = 10) -> list[tuple[str, float]]:

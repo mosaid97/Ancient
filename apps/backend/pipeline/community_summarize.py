@@ -199,8 +199,8 @@ def load_bipartite_graph(
 
     chunk_set: dict[str, int] = {}
     keyword_set: dict[str, int] = {}
-    edge_list: list[tuple[int, int]] = []
 
+    # Pass 1: assign stable indices to all unique IDs
     for row in rows:
         cid = row["chunk_id"]
         kid = row["keyword_name"]
@@ -208,13 +208,21 @@ def load_bipartite_graph(
             chunk_set[cid] = len(chunk_set)
         if kid not in keyword_set:
             keyword_set[kid] = len(keyword_set)
-        edge_list.append((chunk_set[cid], len(chunk_set) + keyword_set[kid]))
 
-    chunk_ids = [None] * len(chunk_set)
+    n_chunks = len(chunk_set)
+    n_keywords = len(keyword_set)
+
+    # Pass 2: build edge list with stable keyword vertex offset
+    edge_list: list[tuple[int, int]] = [
+        (chunk_set[row["chunk_id"]], n_chunks + keyword_set[row["keyword_name"]])
+        for row in rows
+    ]
+
+    chunk_ids = [None] * n_chunks
     for cid, idx in chunk_set.items():
         chunk_ids[idx] = cid
 
-    return chunk_ids, edge_list, len(chunk_set), len(keyword_set)
+    return chunk_ids, edge_list, n_chunks, n_keywords
 
 
 def run_leiden(
@@ -238,9 +246,10 @@ def run_leiden(
 
     # Project to CHUNK-only unipartite graph via shared keyword neighbours
     chunk_verts = list(range(n_chunks))
+    # which=1 → True-type vertices = chunks (types[i]=True for i < n_chunks)
     proj = g.bipartite_projection(
         types=[i < n_chunks for i in range(n_total)],
-        which=0,  # project chunk side
+        which=1,
     )
 
     # Leiden community detection
