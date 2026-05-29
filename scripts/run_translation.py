@@ -49,7 +49,7 @@ def _setup_logging(log_file: str) -> None:
 def _connect():
     return GraphDatabase.driver(
         os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-        auth=(os.getenv("NEO4J_USER", "neo4j"), os.getenv("NEO4J_PASSWORD", os.getenv("NEO4J_PASSWORD", "AncientChina"))),
+        auth=(os.getenv("NEO4J_USERNAME", "neo4j"), os.getenv("NEO4J_PASSWORD", "AncientChina")),
     )
 
 

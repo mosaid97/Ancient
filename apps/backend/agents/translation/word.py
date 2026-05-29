@@ -176,7 +176,7 @@ def analyze_words(
         apply_loan=True,
     )
     canonical = norm_result.canonical
-    steps_applied = [s for s in norm_result.steps if norm_result.steps.get(s, False)] if hasattr(norm_result.steps, "get") else []
+    steps_applied = [step.name for step in norm_result.steps if step.applied]
 
     # Step 2: tokenize canonical text
     raw_tokens = tokenize(canonical, language)
