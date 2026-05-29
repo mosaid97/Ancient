@@ -1,11 +1,17 @@
 """Embedding pipeline — generates 1024-dim text-embedding-v4 vectors for CHUNK nodes.
 
-Reads chunks with embeddingStatus='pending' (or recompute=True), calls
-the Silra embeddings API in batches of 32, and writes float[] vectors back
-to CHUNK.embedding alongside metadata properties.
+Reads chunks with embeddingStatus='pending' (or recompute=True), calls the
+Silra embeddings API in batches of 10 (hard API limit), and writes two vectors:
+
+  embeddingClassical — computed over coalesce(textCanonical, text)
+                       so the philological normalization layer reaches retrieval
+                       (plan §2.7 / integrity gap G1).
+  embeddingVernacular — computed over textVernacular when present (may be NULL).
+  embedding           — alias of embeddingClassical for back-compat.
 
 CHUNK properties written:
-  embedding, embeddingModel, embeddingDims, embeddingStatus, embeddingAt
+  embedding, embeddingClassical, embeddingVernacular,
+  embeddingModel, embeddingDims, embeddingStatus, embeddingAt
 """
 from __future__ import annotations
 
@@ -88,11 +94,17 @@ class EmbedRunReport:
 # Cypher
 # ---------------------------------------------------------------------------
 
+# Classical text: prefer normalized canonical form; fall back to raw OCR/native.
+# This ensures the philological normalization layer (異體字/T-S/避諱) reaches
+# retrieval (plan §2.7, integrity gap G1).
 _CHUNK_QUERY = """
 MATCH (c:CHUNK)
 WHERE (c.embeddingStatus = 'pending' OR $recompute)
   AND c.text IS NOT NULL AND c.charCount > 0
-RETURN c.id AS chunk_id, c.text AS text
+RETURN
+  c.id                                       AS chunk_id,
+  coalesce(c.textCanonical, c.text)          AS text_classical,
+  c.textVernacular                           AS text_vernacular
 ORDER BY c.id
 SKIP $skip LIMIT $batch
 """
@@ -100,11 +112,13 @@ SKIP $skip LIMIT $batch
 _EMBED_WRITE = """
 UNWIND $rows AS r
 MATCH (c:CHUNK {id: r.chunk_id})
-SET c.embedding       = r.embedding,
-    c.embeddingModel  = r.model,
-    c.embeddingDims   = r.dims,
-    c.embeddingStatus = 'ok',
-    c.embeddingAt     = r.ts
+SET c.embeddingClassical  = r.embedding_classical,
+    c.embedding           = r.embedding_classical,
+    c.embeddingVernacular = r.embedding_vernacular,
+    c.embeddingModel      = r.model,
+    c.embeddingDims       = r.dims,
+    c.embeddingStatus     = 'ok',
+    c.embeddingAt         = r.ts
 """
 
 _EMBED_FAIL = """
@@ -121,10 +135,14 @@ def embed_chunks(
     max_chunks: int | None = None,
     recompute: bool = False,
 ) -> EmbedRunReport:
-    """Embed all pending CHUNK nodes and write vectors back to Neo4j.
+    """Embed all pending CHUNK nodes and write classical + vernacular vectors.
 
-    Chunks with embeddingStatus='pending' are processed by default.
-    Set recompute=True to re-embed already-embedded chunks.
+    Classical vector: coalesce(textCanonical, text) — normalization reaches retrieval.
+    Vernacular vector: textVernacular when present (skipped when NULL).
+    Both written per batch; embeddingStatus='ok' only after both succeed.
+
+    Set recompute=True to re-embed already-embedded chunks (needed after A1
+    populates textCanonical corpus-wide).
     """
     embed_model = model or os.getenv("EMBED_LLM_MODEL", "text-embedding-v4")
     client = _get_embed_client()
@@ -143,40 +161,58 @@ def embed_chunks(
 
         report.chunks_total += len(rows)
         chunk_ids = [r["chunk_id"] for r in rows]
-        texts = [r["text"] for r in rows]
+        classical_texts = [r["text_classical"] for r in rows]
+        vernacular_texts = [r["text_vernacular"] for r in rows]  # may contain None
 
+        # --- classical embedding (always) ---
         try:
-            vectors = _batch_embed(client, texts, model=embed_model, batch_size=batch_size)
+            classical_vectors = _batch_embed(
+                client, classical_texts, model=embed_model, batch_size=batch_size
+            )
         except Exception as exc:
-            log.error("Batch embedding failed for %d chunks: %s", len(rows), exc)
+            log.error("Classical embed batch failed for %d chunks: %s", len(rows), exc)
             for cid in chunk_ids:
                 with driver.session() as s:
                     s.run(_EMBED_FAIL, chunk_id=cid, error=str(exc)).consume()
             report.chunks_failed += len(rows)
-            report.errors.append(f"batch skip={skip}: {exc}")
+            report.errors.append(f"classical skip={skip}: {exc}")
             skip += len(rows)
             continue
+
+        # --- vernacular embedding (only when textVernacular is non-null) ---
+        vern_idx = [i for i, t in enumerate(vernacular_texts) if t]
+        vernacular_vectors: list[list[float] | None] = [None] * len(rows)
+        if vern_idx:
+            vern_subset = [vernacular_texts[i] for i in vern_idx]
+            try:
+                vern_results = _batch_embed(
+                    client, vern_subset, model=embed_model, batch_size=batch_size
+                )
+                for pos, vec in zip(vern_idx, vern_results):
+                    vernacular_vectors[pos] = vec
+            except Exception as exc:
+                # Vernacular failure is non-fatal — log and continue with classical only
+                log.warning("Vernacular embed batch failed (non-fatal): %s", exc)
 
         ts_now = datetime.now(timezone.utc).isoformat()
         write_rows = [
             {
                 "chunk_id": cid,
-                "embedding": vec,
+                "embedding_classical": cvec,
+                "embedding_vernacular": vernacular_vectors[i],
                 "model": embed_model,
                 "dims": _EMBED_DIMS,
                 "ts": ts_now,
             }
-            for cid, vec in zip(chunk_ids, vectors)
+            for i, (cid, cvec) in enumerate(zip(chunk_ids, classical_vectors))
         ]
         with driver.session() as s:
             s.run(_EMBED_WRITE, rows=write_rows).consume()
 
         report.chunks_embedded += len(write_rows)
         log.info(
-            "Embedded skip=%d n=%d total_embedded=%d",
-            skip,
-            len(rows),
-            report.chunks_embedded,
+            "Embedded skip=%d n=%d total_embedded=%d (vernacular=%d)",
+            skip, len(rows), report.chunks_embedded, len(vern_idx),
         )
         skip += len(rows)
 

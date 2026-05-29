@@ -158,7 +158,8 @@ def init_schema(
             }
     """
     if embedding_dims is None:
-        embedding_dims = int(os.getenv("EMBEDDING_DIMS", "2048"))
+        # AGENTS.md §11 (2026-05-16): EMBEDDING_DIMS=1024 is canonical for text-embedding-v4.
+        embedding_dims = int(os.getenv("EMBEDDING_DIMS", "1024"))
     if similarity not in {"cosine", "euclidean"}:
         raise ValueError(f"similarity must be 'cosine' or 'euclidean', got {similarity!r}")
 
