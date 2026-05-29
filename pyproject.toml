@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4>=4.14.3",
     "ebooklib>=0.20",
+    "flagembedding>=1.4.0",
     "fugashi>=1.5.2",
     "httpx>=0.28.1",
     "ipykernel>=7.2.0",
