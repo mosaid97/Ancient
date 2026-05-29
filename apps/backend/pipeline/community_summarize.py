@@ -246,7 +246,7 @@ def run_leiden(
     # Leiden community detection
     partition = proj.community_leiden(
         objective_function="modularity",
-        resolution_parameter=resolution,
+        resolution=resolution,
         n_iterations=10,
     )
 

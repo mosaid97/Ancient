@@ -46,8 +46,8 @@ _EMBED_BATCH = 10
 _QUOTE_PAIRS: list[tuple[str, str]] = [
     ("「", "」"),
     ("『", "』"),
-    (""", """),
-    ("'", "'"),
+    ("“", "”"),   # LEFT/RIGHT DOUBLE QUOTATION MARK
+    ("‘", "’"),   # LEFT/RIGHT SINGLE QUOTATION MARK
     ("《", "》"),
     ("〈", "〉"),
 ]
