@@ -276,7 +276,7 @@ def _process_secondary(
             text,
             lang=language.replace("zh-", "zh").replace("kanbun", "ja"),
             era=era or "",
-            loan=False,
+            apply_loan=False,
         )
         concepts = _extract_concepts(norm_result.canonical, client, model)
 
