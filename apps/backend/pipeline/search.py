@@ -623,3 +623,161 @@ def _fetch_chunks_by_ids(
         )
         for r in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# C1–C3: Hybrid search (BM25 + dense + community + RRF + rerank + verifier)
+# ---------------------------------------------------------------------------
+
+def hybrid_search(
+    driver: Driver,
+    query: str,
+    bm25_corpus: "BM25Corpus | None" = None,  # type: ignore[name-defined]
+    *,
+    top_k: int = 10,
+    rerank_top_k: int = 20,
+    use_community: bool = False,
+    verify_span: str | None = None,
+) -> "SearchResponse":  # type: ignore[name-defined]
+    """C1–C3 hybrid pipeline: intent → HyDE → BM25+dense+community → RRF → rerank → verify.
+
+    Args:
+        driver: Open Neo4j driver.
+        query: Natural-language query.
+        bm25_corpus: Pre-built BM25Corpus (build once at startup via
+            ``BM25Corpus.build(driver)``). If None, BM25 leg is skipped.
+        top_k: Results per ribbon in the final output.
+        rerank_top_k: Candidates from RRF to rerank (top-100 → top-20 → top_k).
+        use_community: Enable community-summary routing leg.
+        verify_span: Span to verify against each result (defaults to query).
+
+    Returns:
+        :class:`SearchResponse` with two ribbons (primary + secondary), each
+        result carrying a :class:`VerifierResult` badge.
+    """
+    import time as _time
+    from apps.backend.agents.intent import classify_intent, tier_boost
+    from apps.backend.agents.hyde import generate_hyde_passage
+    from apps.backend.agents.rerank import rerank as rerank_fn
+    from apps.backend.agents.output import build_response
+    from apps.backend.retrieval.dense import dense_search
+    from apps.backend.retrieval.fuse import rrf_fuse
+    from apps.backend.retrieval.community import community_search
+
+    t0 = _time.time()
+
+    # 1. Intent classification
+    intent = classify_intent(query)
+    log.info("hybrid_search: intent=%s query=%r", intent, query[:50])
+
+    # 2. HyDE expansion (for factual / interpretive queries)
+    hyde_passage = None
+    if intent in ("factual", "interpretive"):
+        hyde_passage = generate_hyde_passage(query)
+
+    # 3. Retrieval legs
+    ranked_lists = []
+
+    # BM25 leg
+    if bm25_corpus is not None:
+        bm25_hits = bm25_corpus.query(query, top_k=100)
+        if bm25_hits:
+            ranked_lists.append(bm25_hits)
+
+    # Dense leg (original query)
+    dense_hits = dense_search(driver, query, top_k=100)
+    if dense_hits:
+        ranked_lists.append(dense_hits)
+
+    # Dense leg (HyDE passage)
+    if hyde_passage:
+        hyde_hits = dense_search(driver, hyde_passage, top_k=50)
+        if hyde_hits:
+            ranked_lists.append(hyde_hits)
+
+    # Community leg
+    if use_community and intent == "synthesis":
+        comm_hits = community_search(driver, query, top_k=5)
+        if comm_hits:
+            ranked_lists.append(comm_hits)
+
+    if not ranked_lists:
+        log.warning("hybrid_search: all retrieval legs returned 0 results")
+        from apps.backend.agents.output import SearchResponse
+        return SearchResponse(query=query, intent=intent)
+
+    # 4. RRF fusion
+    fused = rrf_fuse(ranked_lists, top_k=100)
+
+    # 5. Tier boost
+    # We need tier for each chunk — fetch from fused list
+    chunk_ids_100 = [cid for cid, _ in fused]
+    tier_map: dict[str, str | None] = {}
+    if chunk_ids_100:
+        with driver.session() as s:
+            rows = s.run(
+                "UNWIND $ids AS cid MATCH (c:CHUNK {id: cid}) RETURN c.id AS id, c.tier AS tier",
+                ids=chunk_ids_100,
+            ).data()
+        for r in rows:
+            tier_map[r["id"]] = r.get("tier")
+
+    boosted = tier_boost(fused, tier_map, intent)
+    boosted.sort(key=lambda x: x[1], reverse=True)
+
+    # 6. Fetch texts for reranker
+    rerank_candidates_raw = boosted[:100]
+    rerank_ids = [cid for cid, _ in rerank_candidates_raw]
+    score_map = dict(rerank_candidates_raw)
+
+    text_rows: list[dict] = []
+    if rerank_ids:
+        with driver.session() as s:
+            text_rows = s.run(
+                "UNWIND $ids AS cid MATCH (c:CHUNK {id: cid}) "
+                "RETURN c.id AS id, coalesce(c.textCanonical, c.text) AS text",
+                ids=rerank_ids,
+            ).data()
+    text_map = {r["id"]: r["text"] or "" for r in text_rows}
+
+    candidates = [
+        (cid, text_map.get(cid, ""), score_map[cid])
+        for cid in rerank_ids
+        if text_map.get(cid)
+    ]
+
+    # 7. Cross-encoder rerank
+    try:
+        reranked = rerank_fn(query, candidates, top_k=rerank_top_k)
+    except Exception as exc:
+        log.warning("Reranker failed, using retrieval order: %s", exc)
+        from apps.backend.agents.rerank import RerankResult
+        reranked = [
+            RerankResult(chunk_id=cid, retrieval_score=s, rerank_score=s, rank=i + 1)
+            for i, (cid, _, s) in enumerate(candidates[:rerank_top_k])
+        ]
+
+    # 8. Two-ribbon output + verifier
+    response = build_response(
+        driver, query, intent, reranked,
+        verify_span=verify_span,
+        top_per_ribbon=top_k,
+    )
+    response.duration_ms = (_time.time() - t0) * 1000
+    log.info(
+        "hybrid_search: primary=%d secondary=%d verified=%d/%d in %.1fms",
+        len(response.primary_ribbon),
+        len(response.secondary_ribbon),
+        sum(1 for r in response.all_results if r.verified),
+        len(response.all_results),
+        response.duration_ms,
+    )
+    return response
+
+
+# Type alias for forward references
+try:
+    from apps.backend.retrieval.bm25 import BM25Corpus  # noqa: F401
+    from apps.backend.agents.output import SearchResponse  # noqa: F401
+except ImportError:
+    pass
