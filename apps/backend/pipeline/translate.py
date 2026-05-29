@@ -94,7 +94,7 @@ _FETCH_CHUNKS = """
 MATCH (ch:CHUNK)-[:HAS]-(p:PAGE)
 WHERE ($recompute OR ch.translationStatus IS NULL OR ch.translationStatus = 'failed')
   AND ($tier_filter IS NULL OR p.tier = $tier_filter)
-  AND p.fusionStatus = 'ok'
+  AND (p.fusionStatus IN ['ok', 'single'] OR (p.fusionStatus IS NULL AND p.mode = 'native_text'))
 OPTIONAL MATCH (sec:SECTION)-[:INCLUDE]->(p)
 OPTIONAL MATCH (doc:DOCUMENT)-[:CONSIST_OF]->(:CHAPTER)-[:INCLUDE]->(sec)
 RETURN
