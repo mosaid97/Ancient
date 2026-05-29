@@ -173,7 +173,7 @@ def analyze_words(
         text,
         lang=language.replace("zh-", "zh").replace("kanbun", "ja"),
         era=era or "",
-        loan=True,
+        apply_loan=True,
     )
     canonical = norm_result.canonical
     steps_applied = [s for s in norm_result.steps if norm_result.steps.get(s, False)] if hasattr(norm_result.steps, "get") else []
