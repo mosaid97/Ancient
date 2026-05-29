@@ -99,7 +99,7 @@ class EmbedRunReport:
 # retrieval (plan §2.7, integrity gap G1).
 _CHUNK_QUERY = """
 MATCH (c:CHUNK)
-WHERE (c.embeddingStatus = 'pending' OR $recompute)
+WHERE (c.embeddingStatus IN ['pending', 'failed'] OR $recompute)
   AND c.text IS NOT NULL AND c.charCount > 0
 RETURN
   c.id                                       AS chunk_id,

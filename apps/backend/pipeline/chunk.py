@@ -136,6 +136,7 @@ WHERE ($recompute OR p.chunkingAt IS NULL)
 RETURN
   p.id              AS page_id,
   p.documentId      AS document_id,
+  p.tier            AS tier,
   p.language        AS language,
   p.textFused       AS textFused,
   p.text            AS text,
@@ -152,6 +153,7 @@ MERGE (ch:CHUNK {id: c.id})
 ON CREATE SET
   ch.pageId          = c.pageId,
   ch.documentId      = c.documentId,
+  ch.tier            = c.tier,
   ch.chunkIndex      = c.chunkIndex,
   ch.text            = c.text,
   ch.charCount       = c.charCount,
@@ -165,6 +167,7 @@ ON CREATE SET
 ON MATCH SET
   ch.text            = c.text,
   ch.charCount       = c.charCount,
+  ch.tier            = c.tier,
   ch.chunkingAt      = c.chunkingAt
 WITH ch, c
 MATCH (p:PAGE {id: c.pageId})
@@ -226,6 +229,7 @@ def chunk_pages(
                         "id": _make_chunk_id(page_id, idx),
                         "pageId": page_id,
                         "documentId": row.get("document_id") or "",
+                        "tier": row.get("tier"),
                         "chunkIndex": idx,
                         "text": chunk_text,
                         "charCount": len(chunk_text),
