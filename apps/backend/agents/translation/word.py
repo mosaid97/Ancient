@@ -182,7 +182,14 @@ def analyze_words(
     raw_tokens = tokenize(canonical, language)
 
     # Step 3 + 4: dict lookup + polysemy resolution
-    lang_key = "ja" if language.startswith("ja") or language == "kanbun" else "zh"
+    if language.startswith("ja") or language == "kanbun":
+        lang_key = "ja"
+    elif language == "en":
+        lang_key = "en"
+    elif language == "ar":
+        lang_key = "ar"
+    else:
+        lang_key = "zh"
     annotated: list[AnnotatedToken] = []
     for tok in raw_tokens:
         entries = lookup_term(driver, tok.lemma, lang_key)

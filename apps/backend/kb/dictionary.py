@@ -28,6 +28,12 @@ from neo4j import Driver
 log = logging.getLogger(__name__)
 
 _SEED_PATH = Path(__file__).parents[3] / "data" / "seeds" / "dictionary_seed.jsonl"
+_SEED_PATHS_BY_LANG: dict[str, Path] = {
+    "zh": _SEED_PATH,
+    "ja": Path(__file__).parents[3] / "data" / "seeds" / "dictionary_seed_ja.jsonl",
+    "en": Path(__file__).parents[3] / "data" / "seeds" / "dictionary_seed_en.jsonl",
+    "ar": Path(__file__).parents[3] / "data" / "seeds" / "dictionary_seed_ar.jsonl",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -206,6 +212,18 @@ def lookup_term(
         )
         for r in rows
     ]
+
+
+def seed_all_dictionaries(driver: Driver) -> dict[str, int]:
+    """Upsert all language dictionary seed files.
+
+    Returns:
+        Mapping of language code → number of entries upserted.
+    """
+    totals: dict[str, int] = {}
+    for lang, path in _SEED_PATHS_BY_LANG.items():
+        totals[lang] = seed_dictionary(driver, path)
+    return totals
 
 
 def upsert_entry(driver: Driver, entry: DictEntry) -> str:

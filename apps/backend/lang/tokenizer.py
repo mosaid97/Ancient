@@ -119,6 +119,28 @@ def _tokenize_ja(text: str) -> list[Token]:
         return [Token(surface=c, lemma=c, pos="CHAR", language="ja") for c in text if c.strip()]
 
 
+def _tokenize_en(text: str) -> list[Token]:
+    """Tokenize English text — whitespace + regex word splitting."""
+    import re
+    tokens: list[Token] = []
+    for word in re.findall(r"[A-Za-z](?:[A-Za-z'\-]*[A-Za-z])?", text):
+        w = word.lower()
+        if w:
+            tokens.append(Token(surface=word, lemma=w, pos="WORD", language="en"))
+    return tokens
+
+
+def _tokenize_ar(text: str) -> list[Token]:
+    """Tokenize Arabic text — whitespace splitting with punctuation strip."""
+    import re
+    tokens: list[Token] = []
+    for word in re.split(r"[\s،؛؟؍،؛؟]+", text):
+        word = word.strip("‏‎.,;:!?()\"""''")
+        if word:
+            tokens.append(Token(surface=word, lemma=word, pos="WORD", language="ar"))
+    return tokens
+
+
 def _is_cjk(char: str) -> bool:
     cp = ord(char)
     return (
@@ -192,6 +214,10 @@ class TokenizerRouter:
             return _tokenize_ja(text)
         if lang == "mixed":
             return _tokenize_mixed(text)
+        if lang == "en":
+            return _tokenize_en(text)
+        if lang == "ar":
+            return _tokenize_ar(text)
         # zh-classical, zh-modern, unknown → jieba
         return _tokenize_zh(text)
 
