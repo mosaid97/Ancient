@@ -128,6 +128,7 @@ def _select_pages_cypher(
         "paddleocr": "paddleOcrStatus",
         "deepseek_ocr": "deepseekOcrStatus",
         "qwen_vl_ocr": "qwenVlOcrStatus",
+        "custom_ocr": "customOcrStatus",
     }[engine]
     empty_clause = f" OR p.{status_col} = 'empty'" if include_empty else ""
     paddle_clause = (
@@ -194,6 +195,20 @@ SET p.qwenVlOcrText = $text,
     p.qwenVlOcrStatus = $status,
     p.qwenVlOcrError = $error,
     p.qwenVlOcrAt = timestamp()
+RETURN p.id AS id
+"""
+
+_CUSTOM_PAGE_UPDATE = """
+MATCH (p:PAGE {id: $page_id})
+SET p.customOcrText = $text,
+    p.customOcrLinesJson = $lines_json,
+    p.customOcrConfidence = $confidence,
+    p.customOcrModelVersion = $model_version,
+    p.customOcrDurationSeconds = $duration_seconds,
+    p.customOcrCharCount = $char_count,
+    p.customOcrStatus = $status,
+    p.customOcrError = $error,
+    p.customOcrAt = timestamp()
 RETURN p.id AS id
 """
 
@@ -375,6 +390,26 @@ def _write_qwen_result(driver: Driver, page_id: str, result: OCRPageResult) -> s
     with driver.session() as session:
         session.run(
             _QWEN_VL_PAGE_UPDATE,
+            page_id=page_id,
+            text=result.text or "",
+            lines_json=serialize_lines(result.lines),
+            confidence=float(result.confidence or 0.0),
+            model_version=result.model_version,
+            duration_seconds=float(result.duration_seconds or 0.0),
+            char_count=int(result.char_count or 0),
+            status=status,
+            error=result.error,
+        ).consume()
+    return status
+
+
+def _write_custom_result(driver: Driver, page_id: str, result: OCRPageResult) -> str:
+    """Persist a custom (user-supplied) OCR result; returns the classified status."""
+
+    status = _classify_status(result)
+    with driver.session() as session:
+        session.run(
+            _CUSTOM_PAGE_UPDATE,
             page_id=page_id,
             text=result.text or "",
             lines_json=serialize_lines(result.lines),
@@ -856,6 +891,149 @@ def run_qwen_pages(
                 "%.2fs/page avg)",
                 idx, len(rows), so_far, eta, so_far / max(idx, 1),
             )
+
+    elapsed = time.monotonic() - started
+    report.duration_seconds = round(elapsed, 3)
+    report.avg_seconds_per_page = (
+        round(elapsed / max(report.pages_processed, 1), 3)
+        if report.pages_processed else 0.0
+    )
+    report.sample_outcomes = [o.to_dict() for o in sample]
+    return report
+
+
+def run_custom_pages(
+    *,
+    driver: Driver,
+    minio_client,
+    base_url: str,
+    api_key: str,
+    model: str,
+    bucket: str = "ancient-pages",
+    document_id: str | None = None,
+    max_pages: int | None = None,
+    recompute_existing: bool = False,
+    include_empty: bool = False,
+    roles: tuple[str, ...] = ("body",),
+    sample_size: int = 5,
+    progress_every: int = 25,
+    max_tokens: int = 4096,
+    timeout: float = 180.0,
+) -> ExtractRunReport:
+    """Run a user-supplied OpenAI-compatible vision OCR engine over eligible PAGEs.
+
+    Mirrors :func:`run_qwen_pages` but routes to
+    :func:`apps.backend.ocr.custom_vlm.custom_ocr_page` with caller-supplied
+    credentials. Writes ``customOcr*`` properties on each PAGE so the HITL
+    fusion screen can render an extra comparison column.
+
+    Credentials (``base_url`` / ``api_key`` / ``model``) are used only for the
+    duration of this call and are never persisted by this function.
+    """
+    from apps.backend.ocr.custom_vlm import custom_ocr_page, make_custom_client
+
+    report = ExtractRunReport(engine="custom_ocr")
+    started = time.monotonic()
+    client = make_custom_client(base_url=base_url, api_key=api_key, timeout=timeout)
+
+    with driver.session() as session:
+        rows = list(
+            session.run(
+                _select_pages_cypher("custom_ocr", include_empty=include_empty),
+                recompute=recompute_existing,
+                document_id=document_id,
+                roles=list(roles),
+            )
+        )
+    if max_pages is not None:
+        rows = rows[:max_pages]
+    report.pages_total = len(rows)
+
+    sample: list[ExtractOutcome] = []
+    for idx, row in enumerate(rows, start=1):
+        page_id = row["page_id"]
+        doc_id = row["document_id"]
+        image_uri = row["image_uri"]
+        language_hint = row.get("language") or "zh-classical"
+        doc_bucket = report.by_document.setdefault(
+            doc_id, {"ok": 0, "empty": 0, "failed": 0, "skipped": 0}
+        )
+        try:
+            payload = _download_bytes(minio_client, bucket, image_uri)
+        except Exception as exc:  # noqa: BLE001
+            outcome = ExtractOutcome(
+                page_id=page_id, document_id=doc_id, engine="custom_ocr",
+                status="failed", error=f"download failed: {exc}",
+            )
+            report.pages_failed += 1
+            doc_bucket["failed"] += 1
+            report.errors.append(f"{page_id}: {outcome.error}")
+            if len(sample) < sample_size:
+                sample.append(outcome)
+            continue
+
+        script_hint = _resolve_script_hint(row.get("tier"), language_hint)
+        result = custom_ocr_page(
+            payload,
+            page_id=page_id,
+            model=model,
+            client=client,
+            language_hint=language_hint,
+            script_hint=script_hint,
+            max_tokens=max_tokens,
+        )
+        try:
+            status = _write_custom_result(driver, page_id, result)
+        except Exception as exc:  # noqa: BLE001
+            outcome = ExtractOutcome(
+                page_id=page_id, document_id=doc_id, engine="custom_ocr",
+                status="failed", error=f"neo4j write failed: {exc}",
+                duration_seconds=result.duration_seconds,
+            )
+            report.pages_failed += 1
+            doc_bucket["failed"] += 1
+            report.errors.append(f"{page_id}: {outcome.error}")
+            if len(sample) < sample_size:
+                sample.append(outcome)
+            continue
+
+        outcome = ExtractOutcome(
+            page_id=page_id, document_id=doc_id, engine="custom_ocr",
+            status=status,
+            char_count=result.char_count,
+            confidence=result.confidence,
+            duration_seconds=result.duration_seconds,
+            error=result.error,
+        )
+        if status == "ok":
+            report.pages_processed += 1
+            report.total_chars += outcome.char_count
+            doc_bucket["ok"] += 1
+        elif status == "empty":
+            report.pages_empty += 1
+            doc_bucket["empty"] += 1
+        else:
+            report.pages_failed += 1
+            doc_bucket["failed"] += 1
+            if outcome.error:
+                report.errors.append(f"{page_id}: {outcome.error}")
+
+        if len(sample) < sample_size:
+            sample.append(outcome)
+
+        if idx % progress_every == 0:
+            so_far = time.monotonic() - started
+            eta = so_far / idx * (len(rows) - idx)
+            logger.info(
+                "custom_ocr progress %d/%d (%.1fs elapsed, ~%.1fs ETA, %.2fs/page avg)",
+                idx, len(rows), so_far, eta, so_far / max(idx, 1),
+            )
+
+    # Best-effort close of the user-supplied client's httpx connection pool.
+    try:
+        client.close()
+    except Exception:  # noqa: BLE001
+        pass
 
     elapsed = time.monotonic() - started
     report.duration_seconds = round(elapsed, 3)

@@ -1,0 +1,2689 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" x-data="app()" x-init="init()">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title x-text="t('app.tagline')">The Ancient</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- TailwindCSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Alpine.js -->
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <style>
+    :root {
+      --jade: #0f766e;
+      --jade-light: #14b8a6;
+      --sidebar-collapsed: 64px;
+      --sidebar-expanded: 240px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f8fafc;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    .cjk {
+      font-family: 'Noto Serif SC', serif;
+    }
+
+    /* Sidebar */
+    #sidebar {
+      width: var(--sidebar-collapsed);
+      transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    #sidebar.expanded {
+      width: var(--sidebar-expanded);
+    }
+    #sidebar .nav-label {
+      opacity: 0;
+      white-space: nowrap;
+      transition: opacity 0.2s ease;
+    }
+    #sidebar.expanded .nav-label {
+      opacity: 1;
+    }
+    #sidebar .logo-text {
+      opacity: 0;
+      white-space: nowrap;
+      transition: opacity 0.2s ease;
+    }
+    #sidebar.expanded .logo-text {
+      opacity: 1;
+    }
+
+    /* Scrollbars */
+    .scrollable {
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #334155 transparent;
+    }
+    .scrollable::-webkit-scrollbar { width: 4px; }
+    .scrollable::-webkit-scrollbar-track { background: transparent; }
+    .scrollable::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+    /* Score bar */
+    .score-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+    .score-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.6s ease;
+    }
+
+    /* Pulse animation */
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .pulse-dot {
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+
+    /* Spinner */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #e2e8f0;
+      border-top-color: #14b8a6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* Toast */
+    .toast-enter {
+      animation: toastIn 0.3s ease forwards;
+    }
+    .toast-exit {
+      animation: toastOut 0.3s ease forwards;
+    }
+    @keyframes toastIn {
+      from { transform: translateY(16px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes toastOut {
+      from { transform: translateY(0); opacity: 1; }
+      to { transform: translateY(16px); opacity: 0; }
+    }
+
+    /* Cards */
+    .result-card {
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .result-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    }
+
+    /* Page transition */
+    .page-content {
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Modal backdrop */
+    .modal-backdrop {
+      animation: backdropIn 0.2s ease;
+    }
+    @keyframes backdropIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .modal-content {
+      animation: modalIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.92) translateY(8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    /* Queue item */
+    .queue-item {
+      transition: background 0.15s ease;
+      cursor: pointer;
+    }
+    .queue-item:hover { background: #1e293b; }
+    .queue-item.active { background: #134e4a; border-left: 3px solid #14b8a6; }
+
+    /* Tab active */
+    .tab-btn { transition: all 0.15s ease; }
+    .tab-btn.active {
+      background: #0f766e;
+      color: white;
+    }
+
+    /* Progress bar */
+    .progress-track {
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.8s ease;
+    }
+
+    /* Watermark */
+    .watermark-char {
+      font-family: 'Noto Serif SC', serif;
+      font-size: 8rem;
+      color: #e2e8f0;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    /* Chip */
+    .keyword-chip {
+      font-size: 0.7rem;
+      padding: 1px 6px;
+      border-radius: 9999px;
+      background: #ccfbf1;
+      color: #0f766e;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+
+<body class="flex h-screen overflow-hidden bg-slate-50">
+
+  <!-- ===== SIDEBAR ===== -->
+  <nav id="sidebar"
+       class="bg-slate-900 flex flex-col items-start py-4 z-20 relative shadow-xl"
+       :class="{ 'expanded': sidebarExpanded }"
+       @mouseenter="sidebarExpanded = true"
+       @mouseleave="sidebarExpanded = false">
+
+    <!-- Logo -->
+    <div class="flex items-center gap-3 px-3 mb-8 w-full">
+      <div class="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-xl cjk"
+           style="background: linear-gradient(135deg, #0f766e, #14b8a6);">
+        古
+      </div>
+      <div class="logo-text">
+        <div class="text-white font-semibold text-sm leading-tight cjk" x-text="t('app.title')"></div>
+        <div class="text-slate-400 text-xs" x-text="t('app.subtitle')"></div>
+      </div>
+    </div>
+
+    <!-- Nav Items -->
+    <div class="flex flex-col w-full gap-1 px-2">
+
+      <!-- Search -->
+      <button @click="navigateTo('search')"
+              class="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-colors duration-150"
+              :class="page === 'search' ? 'bg-teal-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+        </svg>
+        <span class="nav-label text-sm font-medium cjk" x-text="t('nav.search')"></span>
+      </button>
+
+      <!-- Upload -->
+      <button @click="navigateTo('upload')"
+              class="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-colors duration-150"
+              :class="page === 'upload' ? 'bg-teal-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M7 16a4 4 0 0 1-.88-7.9A5 5 0 1 1 15.9 6 5 5 0 0 1 17 16M9 11l3-3 3 3M12 8v9"/>
+        </svg>
+        <span class="nav-label text-sm font-medium cjk" x-text="t('nav.upload')"></span>
+      </button>
+
+      <!-- Review -->
+      <button @click="navigateTo('review')"
+              class="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-colors duration-150"
+              :class="page === 'review' ? 'bg-teal-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+        </svg>
+        <span class="nav-label text-sm font-medium cjk" x-text="t('nav.review')"></span>
+      </button>
+
+      <!-- OCR HITL fusion -->
+      <button @click="navigateTo('ocrhitl')"
+              class="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-colors duration-150"
+              :class="page === 'ocrhitl' ? 'bg-teal-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 5h7v14H4zM13 5h7v14h-7M9 9l-2 2 2 2"/>
+        </svg>
+        <span class="nav-label text-sm font-medium cjk" x-text="t('ocrhitl.title')"></span>
+      </button>
+
+      <!-- Interactive -->
+      <button @click="navigateTo('interactive')"
+              class="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-colors duration-150"
+              :class="page === 'interactive' ? 'bg-teal-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.9L15 14M5 18h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2z"/>
+        </svg>
+        <span class="nav-label text-sm font-medium cjk" x-text="t('nav.interactive')"></span>
+      </button>
+
+      <!-- Dashboard -->
+      <button @click="navigateTo('dashboard')"
+              class="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-colors duration-150"
+              :class="page === 'dashboard' ? 'bg-teal-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 0-2 2h-2a2 2 0 0 1-2-2z"/>
+        </svg>
+        <span class="nav-label text-sm font-medium cjk" x-text="t('nav.dashboard')"></span>
+      </button>
+
+      <!-- Pipeline -->
+      <button @click="navigateTo('pipeline')"
+              class="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-colors duration-150"
+              :class="page === 'pipeline' ? 'bg-teal-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+        </svg>
+        <span class="nav-label text-sm font-medium cjk" x-text="t('nav.pipeline')"></span>
+      </button>
+    </div>
+
+    <!-- Locale switcher + version -->
+    <div class="mt-auto px-2 w-full">
+      <!-- User / Login -->
+      <div class="nav-label mb-1 px-1">
+        <div x-show="currentUser" class="flex items-center gap-2">
+          <div class="w-6 h-6 rounded-full bg-teal-700 flex items-center justify-center text-white text-xs font-bold" x-text="currentUser ? currentUser.email[0].toUpperCase() : ''"></div>
+          <span class="text-slate-300 text-xs truncate flex-1" x-text="currentUser ? currentUser.email : ''"></span>
+          <button @click="logout()" class="text-slate-500 hover:text-red-400 text-xs">✕</button>
+        </div>
+        <button x-show="!currentUser" @click="showLoginModal = true"
+                class="w-full text-xs text-slate-500 hover:text-teal-400 text-left transition-colors">
+          ↗ Sign in
+        </button>
+      </div>
+      <div class="nav-label mb-2">
+        <select x-model="locale" @change="setLocale(locale)"
+                class="w-full bg-slate-800 text-slate-200 text-xs rounded-lg px-2 py-1.5 border border-slate-700 focus:outline-none">
+          <option value="en">English</option>
+          <option value="zh">中文</option>
+          <option value="ja">日本語</option>
+          <option value="ar">العربية</option>
+        </select>
+      </div>
+      <div class="nav-label text-slate-600 text-xs py-1 px-1" x-text="t('common.version')">v0.2.0-alpha</div>
+    </div>
+  </nav>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main class="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50">
+
+    <!-- ===== PAGE: SEARCH ===== -->
+    <div x-show="page === 'search'" class="flex flex-col h-full page-content">
+
+      <!-- Search Header -->
+      <div class="bg-white border-b border-slate-200 px-6 pt-6 pb-4 shadow-sm">
+        <div class="mb-1 flex items-center gap-2">
+          <span class="text-teal-700 text-sm font-semibold tracking-wide" x-text="t('app.tagline')"></span>
+        </div>
+        <!-- Search input row -->
+        <div class="flex gap-3">
+          <div class="flex-1 relative">
+            <input
+              x-model="query"
+              @keydown.enter="doSearch()"
+              type="text"
+              :placeholder="t('search.placeholder')"
+              class="w-full pl-4 pr-12 py-3 border border-slate-300 rounded-xl text-slate-800 cjk text-base placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition"
+            />
+            <div x-show="searchLoading" class="absolute right-4 top-1/2 -translate-y-1/2">
+              <div class="spinner"></div>
+            </div>
+          </div>
+          <button @click="doSearch()"
+                  class="px-6 py-3 rounded-xl font-semibold text-white transition-all duration-150 flex items-center gap-2"
+                  style="background: #0f766e;"
+                  :class="{ 'opacity-50 cursor-not-allowed': searchLoading }"
+                  :disabled="searchLoading">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+            </svg>
+            <span class="cjk" x-text="t('search.button')"></span>
+          </button>
+        </div>
+
+        <!-- Filter row -->
+        <div class="flex flex-wrap items-center gap-3 mt-3">
+          <!-- Tier -->
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-500 cjk" x-text="t('search.tier')"></span>
+            <select x-model="filters.tier"
+                    class="text-sm border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500 cjk">
+              <option value="both" x-text="t('search.both')"></option>
+              <option value="primary" x-text="t('search.primary')"></option>
+              <option value="secondary" x-text="t('search.secondary')"></option>
+            </select>
+          </div>
+
+          <!-- Language -->
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-500 cjk" x-text="t('search.lang')"></span>
+            <select x-model="filters.lang"
+                    class="text-sm border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500 cjk">
+              <option value="all" x-text="t('search.all')"></option>
+              <option value="zh-classical" x-text="t('search.classical')"></option>
+              <option value="zh-modern" x-text="t('search.modern')"></option>
+              <option value="ja-kanbun" x-text="t('search.kanbun')"></option>
+              <option value="ja-modern" x-text="t('search.japanese')"></option>
+            </select>
+          </div>
+
+          <!-- Top K -->
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-500" x-text="t('search.topk')"></span>
+            <input type="range" x-model.number="filters.top_k"
+                   min="5" max="20" step="1"
+                   class="w-20 accent-teal-600" />
+            <span class="text-xs font-semibold text-teal-700 w-5" x-text="filters.top_k"></span>
+          </div>
+
+          <!-- Expand Keywords toggle -->
+          <div class="flex items-center gap-2 ml-2">
+            <button @click="filters.expand_keywords = !filters.expand_keywords"
+                    class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200"
+                    :class="filters.expand_keywords ? 'bg-teal-600' : 'bg-slate-300'">
+              <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 shadow-sm"
+                    :class="filters.expand_keywords ? 'translate-x-4' : 'translate-x-1'"></span>
+            </button>
+            <span class="text-xs text-slate-500 cjk" x-text="t('search.expandKeywords')"></span>
+          </div>
+
+          <!-- Search mode -->
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-500 cjk" x-text="t('search.mode')"></span>
+            <select x-model="searchMode"
+                    class="text-sm border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500 cjk">
+              <option value="hybrid" x-text="t('search.hybrid')"></option>
+              <option value="dense" x-text="t('search.dense')"></option>
+            </select>
+          </div>
+
+          <!-- Result count + meta -->
+          <div x-show="searchResults.length > 0" class="ml-auto flex items-center gap-2 flex-wrap">
+            <span x-show="searchBm25Ready && searchMode === 'hybrid'"
+                  class="text-xs px-1.5 py-0.5 bg-teal-50 text-teal-600 rounded font-medium">BM25 ✓</span>
+            <span x-show="searchIntent"
+                  class="text-xs px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded font-medium cjk"
+                  x-text="intentLabel(searchIntent)"></span>
+            <span x-show="searchDuration"
+                  class="text-xs text-slate-400"
+                  x-text="searchDuration ? (searchDuration / 1000).toFixed(1) + 's' : ''"></span>
+            <span class="text-xs text-slate-400 cjk"><span class="font-semibold text-slate-600" x-text="searchResults.length"></span> <span x-text="t('search.results')"></span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results area -->
+      <div class="flex-1 overflow-y-auto scrollable px-6 py-4">
+
+        <!-- Error state -->
+        <div x-show="searchError" class="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
+          <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+          </svg>
+          <span class="text-red-700 text-sm" x-text="searchError"></span>
+          <button @click="searchError = null" class="ml-auto text-red-400 hover:text-red-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Empty state (no query yet) -->
+        <div x-show="!searchLoading && searchResults.length === 0 && !searchError && !query"
+             class="flex flex-col items-center justify-center h-full min-h-64 text-center py-16">
+          <div class="watermark-char mb-4 select-none">古</div>
+          <h3 class="text-slate-500 text-lg font-medium cjk mb-2" x-text="t('search.emptyTitle')"></h3>
+          <p class="text-slate-400 text-sm cjk max-w-sm" x-text="t('search.emptyDesc')"></p>
+          <div class="flex gap-2 mt-4 flex-wrap justify-center">
+            <template x-for="q in ['天下大同', '仁義禮智', '知行合一', '心即理', '格物致知']">
+              <button @click="query = q; doSearch()"
+                      class="px-3 py-1.5 bg-teal-50 text-teal-700 rounded-full text-sm cjk hover:bg-teal-100 transition-colors border border-teal-200">
+                <span x-text="q"></span>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- No results found -->
+        <div x-show="!searchLoading && searchResults.length === 0 && !searchError && query"
+             class="flex flex-col items-center justify-center h-full min-h-64 text-center py-16">
+          <svg class="w-12 h-12 text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M9.172 16.172a4 4 0 0 1 5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+          </svg>
+          <h3 class="text-slate-500 text-base font-medium cjk mb-1" x-text="t('search.noResults')"></h3>
+          <p class="text-slate-400 text-sm cjk" x-text="t('search.noResultsDesc')"></p>
+        </div>
+
+        <!-- Primary sources -->
+        <div x-show="primaryResults.length > 0">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-1 h-5 bg-emerald-500 rounded-full"></div>
+            <h2 class="text-emerald-800 font-semibold cjk" x-text="t('search.primarySources')"></h2>
+            <span class="bg-emerald-100 text-emerald-700 text-xs font-medium px-2 py-0.5 rounded-full"
+                  x-text="primaryResults.length"></span>
+          </div>
+          <div class="space-y-3 mb-6">
+            <template x-for="r in primaryResults" :key="r.chunk_id">
+              <div class="result-card bg-white rounded-xl border border-slate-200 overflow-hidden border-l-4 border-l-emerald-500 p-4">
+                <!-- Top row -->
+                <div class="flex items-start justify-between gap-2 mb-2">
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-semibold text-slate-800 cjk text-sm truncate" x-text="r.document_title || '未知文獻'"></span>
+                      <span class="text-slate-400 text-xs cjk truncate" x-text="r.citation || ''"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                      <span x-show="r.chapter_title" class="text-slate-500 text-xs cjk" x-text="r.chapter_title"></span>
+                      <span x-show="r.section_title" class="text-slate-400 text-xs">· <span class="cjk" x-text="r.section_title"></span></span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 flex-shrink-0">
+                    <!-- Verified badge -->
+                    <span x-show="r.verified"
+                          class="text-xs px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200"
+                          x-text="t('search.verified')"></span>
+                    <span class="text-xs font-bold text-slate-400">#<span x-text="r.rank"></span></span>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                          :class="scoreBadgeClass(r.rerank_score != null ? r.rerank_score : r.score)"
+                          x-text="((r.rerank_score != null ? r.rerank_score : r.score) * 100).toFixed(0) + '%'"></span>
+                  </div>
+                </div>
+
+                <!-- Score bar (uses rerank_score when available) -->
+                <div class="score-bar mb-3">
+                  <div class="score-fill" :style="'width:' + ((r.rerank_score != null ? r.rerank_score : r.score) * 100) + '%; background:' + scoreBarColor(r.rerank_score != null ? r.rerank_score : r.score)"></div>
+                </div>
+
+                <!-- Text excerpt -->
+                <p class="text-slate-700 cjk text-sm leading-relaxed line-clamp-3" x-text="r.text"></p>
+
+                <!-- Bottom row -->
+                <div class="flex items-center gap-2 mt-3 flex-wrap">
+                  <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium cjk" x-text="t('search.primary')"></span>
+                  <span x-show="r.language" class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium cjk"
+                        x-text="langLabel(r.language)"></span>
+                  <span x-show="r.evidence_strength"
+                        class="text-xs px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 font-medium cjk"
+                        x-text="evidenceLabel(r.evidence_strength)"></span>
+                  <div x-show="r.trust_score != null" class="flex items-center gap-1">
+                    <span class="text-xs text-slate-400 cjk" x-text="t('search.trust')"></span>
+                    <div class="flex gap-0.5">
+                      <template x-for="i in 5">
+                        <div class="w-2 h-2 rounded-full"
+                             :class="i <= Math.round((r.trust_score || 0) * 5) ? 'bg-teal-500' : 'bg-slate-200'"></div>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="flex gap-1 flex-wrap ml-1">
+                    <template x-for="kw in (r.keywords || []).slice(0,5)">
+                      <span class="keyword-chip cjk" x-text="kw"></span>
+                    </template>
+                  </div>
+                  <!-- Translation expand -->
+                  <button x-show="r.translation_canonical"
+                          @click="toggleExpanded(r.chunk_id)"
+                          class="ml-auto text-xs text-teal-600 hover:text-teal-800 font-medium cjk transition-colors">
+                    <span x-text="_expandedSet.includes(r.chunk_id) ? t('search.collapseCanonical') : t('search.expandCanonical')"></span>
+                  </button>
+                </div>
+
+                <!-- Translation section -->
+                <div x-show="_expandedSet.includes(r.chunk_id) && r.translation_canonical"
+                     class="mt-3 pt-3 border-t border-slate-100">
+                  <div class="grid grid-cols-2 gap-3">
+                    <div x-show="r.translation_canonical">
+                      <div class="text-xs font-medium text-slate-500 mb-1 cjk" x-text="t('search.canonical')"></div>
+                      <p class="text-slate-700 cjk text-sm leading-relaxed bg-teal-50 rounded-lg p-2 border border-teal-100"
+                         x-text="r.translation_canonical"></p>
+                    </div>
+                    <div x-show="r.translation_vernacular">
+                      <div class="text-xs font-medium text-slate-500 mb-1 cjk" x-text="t('search.vernacular')"></div>
+                      <p class="text-slate-700 cjk text-sm leading-relaxed bg-slate-50 rounded-lg p-2 border border-slate-100"
+                         x-text="r.translation_vernacular"></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Secondary sources -->
+        <div x-show="secondaryResults.length > 0">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-1 h-5 bg-indigo-400 rounded-full"></div>
+            <h2 class="text-indigo-800 font-semibold cjk" x-text="t('search.secondarySources')"></h2>
+            <span class="bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full"
+                  x-text="secondaryResults.length"></span>
+          </div>
+          <div class="space-y-3 mb-6">
+            <template x-for="r in secondaryResults" :key="r.chunk_id">
+              <div class="result-card bg-white rounded-xl border border-slate-200 overflow-hidden border-l-4 border-l-indigo-400 p-4">
+                <div class="flex items-start justify-between gap-2 mb-2">
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-semibold text-slate-800 cjk text-sm truncate" x-text="r.document_title || '未知文獻'"></span>
+                      <span class="text-slate-400 text-xs cjk truncate" x-text="r.citation || ''"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                      <span x-show="r.document_author" class="text-slate-500 text-xs cjk" x-text="r.document_author"></span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 flex-shrink-0">
+                    <span x-show="r.verified"
+                          class="text-xs px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200"
+                          x-text="t('search.verified')"></span>
+                    <span class="text-xs font-bold text-slate-400">#<span x-text="r.rank"></span></span>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                          :class="scoreBadgeClass(r.rerank_score != null ? r.rerank_score : r.score)"
+                          x-text="((r.rerank_score != null ? r.rerank_score : r.score) * 100).toFixed(0) + '%'"></span>
+                  </div>
+                </div>
+                <div class="score-bar mb-3">
+                  <div class="score-fill" :style="'width:' + ((r.rerank_score != null ? r.rerank_score : r.score) * 100) + '%; background: #818cf8'"></div>
+                </div>
+                <p class="text-slate-700 cjk text-sm leading-relaxed line-clamp-3" x-text="r.text"></p>
+                <div class="flex items-center gap-2 mt-3 flex-wrap">
+                  <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium cjk" x-text="t('search.secondary')"></span>
+                  <span x-show="r.language" class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium cjk"
+                        x-text="langLabel(r.language)"></span>
+                  <span x-show="r.evidence_strength"
+                        class="text-xs px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 font-medium cjk"
+                        x-text="evidenceLabel(r.evidence_strength)"></span>
+                  <div class="flex gap-1 flex-wrap ml-1">
+                    <template x-for="kw in (r.keywords || []).slice(0,5)">
+                      <span class="keyword-chip cjk" x-text="kw"></span>
+                    </template>
+                  </div>
+                  <button x-show="r.translation_canonical"
+                          @click="toggleExpanded(r.chunk_id)"
+                          class="ml-auto text-xs text-teal-600 hover:text-teal-800 font-medium cjk transition-colors">
+                    <span x-text="_expandedSet.includes(r.chunk_id) ? t('search.collapseCanonical') : t('search.expandCanonical')"></span>
+                  </button>
+                </div>
+                <div x-show="_expandedSet.includes(r.chunk_id) && r.translation_canonical"
+                     class="mt-3 pt-3 border-t border-slate-100">
+                  <div class="grid grid-cols-2 gap-3">
+                    <div x-show="r.translation_canonical">
+                      <div class="text-xs font-medium text-slate-500 mb-1 cjk" x-text="t('search.canonical')"></div>
+                      <p class="text-slate-700 cjk text-sm leading-relaxed bg-teal-50 rounded-lg p-2 border border-teal-100"
+                         x-text="r.translation_canonical"></p>
+                    </div>
+                    <div x-show="r.translation_vernacular">
+                      <div class="text-xs font-medium text-slate-500 mb-1 cjk" x-text="t('search.vernacular')"></div>
+                      <p class="text-slate-700 cjk text-sm leading-relaxed bg-slate-50 rounded-lg p-2 border border-slate-100"
+                         x-text="r.translation_vernacular"></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ===== PAGE: HITL REVIEW ===== -->
+    <div x-show="page === 'review'" class="flex h-full page-content overflow-hidden">
+
+      <!-- Left panel: Queue -->
+      <div class="w-80 flex-shrink-0 bg-slate-900 flex flex-col h-full border-r border-slate-700">
+        <!-- Queue header -->
+        <div class="px-4 py-4 border-b border-slate-700 flex items-center justify-between">
+          <div>
+            <h2 class="text-white font-semibold cjk text-sm" x-text="t('review.queueTitle')"></h2>
+            <p class="text-slate-400 text-xs mt-0.5" x-text="t('ocrhitl.title')"></p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="bg-teal-700 text-white text-xs font-bold px-2 py-0.5 rounded-full"
+                  x-text="reviewQueue.length"></span>
+            <button @click="loadReviewQueue()"
+                    class="text-slate-400 hover:text-white transition-colors p-1 rounded">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Queue list -->
+        <div class="flex-1 scrollable">
+          <!-- Loading -->
+          <div x-show="reviewLoading" class="flex items-center justify-center py-12">
+            <div class="spinner"></div>
+          </div>
+          <!-- Empty -->
+          <div x-show="!reviewLoading && reviewQueue.length === 0" class="text-center py-12">
+            <svg class="w-10 h-10 text-slate-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+            </svg>
+            <p class="text-slate-500 text-sm cjk" x-text="t('review.queueEmpty')"></p>
+          </div>
+
+          <template x-for="item in reviewQueue" :key="item.page_id">
+            <div class="queue-item px-4 py-3 border-b border-slate-800"
+                 :class="selectedReviewItem && selectedReviewItem.page_id === item.page_id ? 'active' : ''"
+                 @click="selectReviewItem(item)">
+              <div class="flex items-start justify-between gap-2 mb-1.5">
+                <div class="flex-1 min-w-0">
+                  <div class="text-white text-xs font-medium truncate cjk" x-text="item.document_title"></div>
+                  <div class="text-slate-400 text-xs mt-0.5">
+                    <span x-text="t('review.page')"></span> <span x-text="item.page_index"></span> · <span x-text="item.page_id.slice(0,8)"></span>…
+                  </div>
+                </div>
+                <span class="flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-medium"
+                      :class="item.decision === 'failed' ? 'bg-red-900 text-red-300' : 'bg-amber-900 text-amber-300'">
+                  <span class="cjk" x-text="item.decision === 'failed' ? t('review.failed') : t('review.pending')"></span>
+                </span>
+              </div>
+              <!-- Problem class badge -->
+              <div class="mb-1.5">
+                <span class="text-xs px-1.5 py-0.5 rounded font-medium"
+                      :class="problemClassColor(item.problem_class)"
+                      x-text="item.problem_class || 'UNKNOWN'"></span>
+              </div>
+              <!-- Priority bar -->
+              <div class="score-bar mb-1">
+                <div class="score-fill bg-amber-500"
+                     :style="'width:' + ((item.priority_score || 0) * 100) + '%'"></div>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-slate-500 text-xs">CER: <span class="text-slate-300" x-text="((item.inter_engine_cer || 0) * 100).toFixed(1) + '%'"></span></span>
+                <span class="text-slate-500 text-xs"><span class="text-slate-300" x-text="((item.priority_score || 0) * 100).toFixed(0)"></span></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Right panel: Detail -->
+      <div class="flex-1 flex flex-col h-full overflow-hidden bg-slate-50">
+        <!-- Empty state -->
+        <div x-show="!selectedReviewItem" class="flex flex-col items-center justify-center h-full text-center">
+          <div class="watermark-char mb-4 opacity-30 select-none">審</div>
+          <h3 class="text-slate-400 text-lg font-medium cjk" x-text="t('review.selectPage')"></h3>
+          <p class="text-slate-400 text-sm cjk mt-1" x-text="t('review.selectPageDesc')"></p>
+        </div>
+
+        <!-- Detail view -->
+        <div x-show="selectedReviewItem && pageDetail" class="flex flex-col h-full">
+          <!-- Page header -->
+          <div class="bg-white border-b border-slate-200 px-6 py-4 shadow-sm">
+            <div class="flex items-start justify-between">
+              <div>
+                <h2 class="text-slate-800 font-semibold cjk" x-text="pageDetail && pageDetail.page && pageDetail.page.document_title"></h2>
+                <div class="flex items-center gap-3 mt-1">
+                  <span class="text-slate-500 text-xs cjk"><span x-text="t('review.page')"></span> <span x-text="pageDetail && pageDetail.page && pageDetail.page.page_index"></span></span>
+                  <span class="text-slate-400 text-xs" x-text="pageDetail && pageDetail.page && pageDetail.page.tier"></span>
+                  <span class="text-slate-400 text-xs cjk" x-text="pageDetail && pageDetail.page && langLabel(pageDetail.page.language)"></span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span x-show="selectedReviewItem"
+                      class="text-xs px-2 py-1 rounded-full font-medium"
+                      :class="selectedReviewItem && selectedReviewItem.decision === 'failed' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'">
+                  <span class="cjk" x-text="selectedReviewItem && selectedReviewItem.decision === 'failed' ? t('review.failed') : t('review.pending')"></span>
+                </span>
+                <span x-show="selectedReviewItem && selectedReviewItem.problem_class"
+                      class="text-xs px-2 py-1 rounded font-medium"
+                      :class="selectedReviewItem && problemClassColor(selectedReviewItem.problem_class)"
+                      x-text="selectedReviewItem && selectedReviewItem.problem_class"></span>
+              </div>
+            </div>
+
+            <!-- Evaluation info -->
+            <div x-show="pageDetail && pageDetail.evaluation" class="mt-3 bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <p class="text-slate-600 text-xs cjk leading-relaxed" x-text="pageDetail && pageDetail.evaluation && pageDetail.evaluation.reasoning"></p>
+              <div class="flex gap-4 mt-2">
+                <span class="text-xs text-slate-500"><span x-text="t('review.interEngineCer')"></span> <span class="font-semibold text-slate-700"
+                      x-text="pageDetail && pageDetail.evaluation ? ((pageDetail.evaluation.inter_engine_cer || 0) * 100).toFixed(1) + '%' : '-'"></span></span>
+                <span class="text-xs text-slate-500"><span x-text="t('review.cjkValidity')"></span> <span class="font-semibold text-slate-700"
+                      x-text="pageDetail && pageDetail.evaluation ? ((pageDetail.evaluation.cjk_validity_ratio || 0) * 100).toFixed(1) + '%' : '-'"></span></span>
+                <span class="text-xs text-slate-500"><span x-text="t('review.confidence')"></span> <span class="font-semibold text-slate-700"
+                      x-text="pageDetail && pageDetail.evaluation ? ((pageDetail.evaluation.problem_class_confidence || 0) * 100).toFixed(0) + '%' : '-'"></span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Scrollable content -->
+          <div class="flex-1 overflow-y-auto scrollable px-6 py-4 space-y-4">
+
+            <!-- OCR Tab group -->
+            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div class="flex border-b border-slate-200">
+                <span class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide cjk border-r border-slate-100" x-text="t('review.ocrCompare')"></span>
+                <template x-for="tab in ocrTabs" :key="tab.key">
+                  <button @click="activeOcrTab = tab.key"
+                          class="tab-btn px-4 py-2.5 text-sm cjk font-medium border-r border-slate-100 last:border-0 transition-colors"
+                          :class="activeOcrTab === tab.key ? 'active' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'">
+                    <span x-text="tab.label"></span>
+                    <span x-show="tab.key !== 'fused' && pageDetail && pageDetail.ocr && getOcrCer(tab.key)"
+                          class="ml-1 text-xs bg-red-100 text-red-600 px-1 rounded"
+                          x-text="getOcrCer(tab.key)"></span>
+                  </button>
+                </template>
+              </div>
+              <div class="p-4">
+                <template x-for="tab in ocrTabs" :key="tab.key">
+                  <div x-show="activeOcrTab === tab.key">
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-xs text-slate-400 font-medium" x-text="tab.label"></span>
+                      <span x-show="tab.key !== 'fused' && pageDetail && pageDetail.ocr"
+                            class="text-xs text-slate-400 cjk">
+                        <span x-text="t('review.confidence')"></span> <span x-text="pageDetail && pageDetail.ocr ? ((pageDetail.ocr[tab.key + '_confidence'] || 0) * 100).toFixed(0) + '%' : '-'"></span>
+                      </span>
+                      <span x-show="tab.key === 'fused'"
+                            class="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded cjk font-medium" x-text="t('review.fusedText')"></span>
+                    </div>
+                    <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 min-h-24 max-h-48 overflow-y-auto scrollable"
+                         :class="tab.key === 'fused' ? 'bg-teal-50 border-teal-200' : ''">
+                      <p class="cjk text-sm text-slate-700 leading-relaxed whitespace-pre-wrap"
+                         x-text="(pageDetail && pageDetail.ocr && pageDetail.ocr[tab.key]) || '（無數據）'"></p>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- Translation quality section -->
+            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div class="px-4 py-2.5 border-b border-slate-200">
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide cjk" x-text="t('review.translationQuality')"></span>
+              </div>
+              <div class="p-4">
+                <template x-for="(chunk, idx) in (pageDetail && pageDetail.chunks || [])" :key="chunk.chunk_id">
+                  <div class="mb-4 last:mb-0">
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="text-xs font-semibold text-slate-400"><span x-text="t('review.paragraph')"></span> <span x-text="idx + 1"></span></span>
+                      <span class="text-xs px-1.5 py-0.5 rounded"
+                            :class="chunk.translation_status === 'ok' ? 'bg-emerald-100 text-emerald-700' : chunk.translation_status === 'failed' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'">
+                        <span class="cjk" x-text="chunk.translation_status === 'ok' ? t('review.translated') : chunk.translation_status === 'failed' ? t('review.failed') : t('review.pendingTrans')"></span>
+                      </span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                      <div>
+                        <div class="text-xs text-slate-500 mb-1 font-medium cjk" x-text="t('review.original')"></div>
+                        <div class="bg-slate-50 rounded-lg p-2 border border-slate-200 min-h-16 max-h-32 overflow-y-auto scrollable">
+                          <p class="cjk text-xs text-slate-700 leading-relaxed" x-text="chunk.text || '（空）'"></p>
+                        </div>
+                      </div>
+                      <div>
+                        <div class="text-xs text-slate-500 mb-1 font-medium cjk" x-text="t('review.canonical')"></div>
+                        <div class="bg-teal-50 rounded-lg p-2 border border-teal-100 min-h-16 max-h-32 overflow-y-auto scrollable">
+                          <p class="cjk text-xs text-slate-700 leading-relaxed"
+                             x-text="chunk.text_canonical || t('review.pendingTrans')"></p>
+                        </div>
+                      </div>
+                      <div>
+                        <div class="text-xs text-slate-500 mb-1 font-medium cjk" x-text="t('review.vernacular')"></div>
+                        <div class="bg-indigo-50 rounded-lg p-2 border border-indigo-100 min-h-16 max-h-32 overflow-y-auto scrollable">
+                          <p class="cjk text-xs text-slate-700 leading-relaxed"
+                             x-text="chunk.text_vernacular || t('review.pendingTrans')"></p>
+                        </div>
+                      </div>
+                    </div>
+                    <button @click="openCorrectionModal(chunk)"
+                            class="mt-2 text-xs text-blue-600 hover:text-blue-800 cjk transition-colors"
+                            x-text="t('review.submitPara')">
+                    </button>
+                  </div>
+                </template>
+                <div x-show="!pageDetail || !pageDetail.chunks || pageDetail.chunks.length === 0"
+                     class="text-center py-6 text-slate-400 text-sm cjk"
+                     x-text="t('review.noChunks')">
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Action bar -->
+          <div class="bg-white border-t border-slate-200 px-6 py-3 flex items-center gap-3">
+            <button @click="approvePage(pageDetail && pageDetail.page && pageDetail.page.page_id)"
+                    class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium cjk transition-colors">
+              <span x-text="t('review.approve')"></span>
+            </button>
+            <button @click="flagIssue()"
+                    class="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium cjk transition-colors">
+              <span x-text="t('review.flag')"></span>
+            </button>
+            <button @click="openCorrectionModal(null)"
+                    class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium cjk transition-colors">
+              <span x-text="t('review.correct')"></span>
+            </button>
+            <button @click="goNextReview()"
+                    class="flex items-center gap-2 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm font-medium cjk transition-colors ml-auto"
+                    x-text="t('review.nextPage')">
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading detail -->
+        <div x-show="selectedReviewItem && !pageDetail"
+             class="flex items-center justify-center h-full">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE: DASHBOARD ===== -->
+    <div x-show="page === 'dashboard'" class="flex flex-col h-full page-content overflow-y-auto scrollable">
+      <div class="px-6 py-5">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h1 class="text-slate-800 text-xl font-semibold cjk" x-text="t('dashboard.title')"></h1>
+            <p class="text-slate-400 text-sm" x-text="t('dashboard.subtitle')"></p>
+          </div>
+          <button @click="loadStats()"
+                  class="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"/>
+            </svg>
+            <span class="cjk" x-text="t('common.refresh')"></span>
+          </button>
+        </div>
+
+        <!-- Loading -->
+        <div x-show="statsLoading" class="flex items-center justify-center py-16">
+          <div class="spinner"></div>
+        </div>
+
+        <div x-show="!statsLoading && stats">
+
+          <!-- Stat cards -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <!-- Docs -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide cjk" x-text="t('dashboard.documents')"></span>
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-teal-100">
+                  <svg class="w-4 h-4 text-teal-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="text-3xl font-bold text-slate-800" x-text="(stats && stats.documents && stats.documents.total || 0).toLocaleString()"></div>
+              <div class="flex gap-3 mt-2">
+                <span class="text-xs text-emerald-600 cjk"><span x-text="t('dashboard.primary')"></span> <span x-text="stats && stats.documents && stats.documents.primary || 0"></span></span>
+                <span class="text-xs text-indigo-600 cjk"><span x-text="t('dashboard.secondary')"></span> <span x-text="stats && stats.documents && stats.documents.secondary || 0"></span></span>
+              </div>
+            </div>
+
+            <!-- Pages -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide cjk" x-text="t('dashboard.pages')"></span>
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-100">
+                  <svg class="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="text-3xl font-bold text-slate-800" x-text="(stats && stats.pages && stats.pages.total || 0).toLocaleString()"></div>
+              <div class="flex gap-3 mt-2">
+                <span class="text-xs text-slate-500 cjk"><span x-text="t('dashboard.ocr')"></span> <span x-text="stats && stats.pages && stats.pages.ocr || 0"></span></span>
+                <span class="text-xs text-slate-500 cjk"><span x-text="t('dashboard.native')"></span> <span x-text="stats && stats.pages && stats.pages.native || 0"></span></span>
+              </div>
+            </div>
+
+            <!-- Chunks -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide cjk" x-text="t('dashboard.chunks')"></span>
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-100">
+                  <svg class="w-4 h-4 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="text-3xl font-bold text-slate-800" x-text="(stats && stats.chunks && stats.chunks.total || 0).toLocaleString()"></div>
+              <div class="flex gap-3 mt-2">
+                <span class="text-xs text-emerald-600 cjk"><span x-text="t('dashboard.translated')"></span> <span x-text="stats && stats.chunks && stats.chunks.translated || 0"></span></span>
+                <span class="text-xs text-slate-400 cjk"><span x-text="t('dashboard.embedded')"></span> <span x-text="stats && stats.chunks && stats.chunks.embedded || 0"></span></span>
+              </div>
+            </div>
+
+            <!-- Keywords -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide cjk" x-text="t('dashboard.keywords')"></span>
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-100">
+                  <svg class="w-4 h-4 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 0 1 0 2.828l-7 7a2 2 0 0 1-2.828 0l-7-7A1.994 1.994 0 0 1 3 12V7a4 4 0 0 1 4-4z"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="text-3xl font-bold text-slate-800" x-text="(stats && stats.keywords && stats.keywords.total || 0).toLocaleString()"></div>
+              <div class="flex gap-3 mt-2">
+                <span class="text-xs text-purple-600 cjk"><span x-text="t('dashboard.community')"></span> <span x-text="stats && stats.communities && stats.communities.total || 0"></span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Progress bars -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            <!-- Translation progress -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+              <div class="flex items-center justify-between mb-3">
+                <div>
+                  <h3 class="text-slate-700 font-semibold cjk text-sm" x-text="t('dashboard.translationProgress')"></h3>
+                </div>
+                <span class="flex items-center gap-1.5 bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full font-medium cjk">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500 pulse-dot"></span>
+                  <span x-text="t('dashboard.inProgress')"></span>
+                </span>
+              </div>
+              <div class="flex items-baseline gap-2 mb-2">
+                <span class="text-2xl font-bold text-slate-800" x-text="(stats && stats.translation_progress && stats.translation_progress.ok || 0).toLocaleString()"></span>
+                <span class="text-slate-400 text-sm cjk">/ <span x-text="(stats && stats.translation_progress && stats.translation_progress.total || 0).toLocaleString()"></span></span>
+                <span class="ml-auto text-amber-600 font-semibold text-sm" x-text="(stats && stats.translation_progress && stats.translation_progress.pct || 0).toFixed(1) + '%'"></span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill bg-amber-400"
+                     :style="'width:' + (stats && stats.translation_progress && stats.translation_progress.pct || 0) + '%'"></div>
+              </div>
+              <div class="text-xs text-slate-400 mt-2 cjk">
+                <span x-text="t('dashboard.failed')"></span> <span x-text="stats && stats.translation_progress && stats.translation_progress.failed || 0"></span>
+              </div>
+            </div>
+
+            <!-- Embedding progress -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+              <div class="flex items-center justify-between mb-3">
+                <div>
+                  <h3 class="text-slate-700 font-semibold cjk text-sm" x-text="t('dashboard.embeddingProgress')"></h3>
+                </div>
+                <span class="flex items-center gap-1.5 bg-teal-100 text-teal-700 text-xs px-2 py-1 rounded-full font-medium cjk">
+                  <span class="w-1.5 h-1.5 rounded-full bg-teal-500 pulse-dot"></span>
+                  <span x-text="t('dashboard.inProgress')"></span>
+                </span>
+              </div>
+              <div class="flex items-baseline gap-2 mb-2">
+                <span class="text-2xl font-bold text-slate-800" x-text="(stats && stats.embedding_progress && stats.embedding_progress.ok || 0).toLocaleString()"></span>
+                <span class="text-slate-400 text-sm cjk">/ <span x-text="(stats && stats.embedding_progress && stats.embedding_progress.total || 0).toLocaleString()"></span></span>
+                <span class="ml-auto text-teal-600 font-semibold text-sm" x-text="(stats && stats.embedding_progress && stats.embedding_progress.pct || 0).toFixed(1) + '%'"></span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" style="background: #14b8a6;"
+                     :style="'width:' + (stats && stats.embedding_progress && stats.embedding_progress.pct || 0) + '%'"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Charts -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            <!-- Donut chart -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+              <h3 class="text-slate-700 font-semibold cjk text-sm mb-4" x-text="t('dashboard.chunkTierDist')"></h3>
+              <div class="flex items-center justify-center" style="height: 200px;">
+                <canvas id="tierChart" width="200" height="200"></canvas>
+              </div>
+            </div>
+            <!-- Bar chart -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+              <h3 class="text-slate-700 font-semibold cjk text-sm mb-4" x-text="t('dashboard.ocrPageStatus')"></h3>
+              <div style="height: 200px;">
+                <canvas id="ocrStatusChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div x-show="!statsLoading && !stats" class="text-center py-16">
+          <svg class="w-12 h-12 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M9.172 16.172a4 4 0 0 1 5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+          </svg>
+          <p class="text-slate-500 cjk" x-text="t('dashboard.noStats')"></p>
+          <button @click="loadStats()" class="mt-3 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm cjk hover:bg-teal-700 transition-colors" x-text="t('dashboard.loadStats')"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE: PIPELINE ===== -->
+    <div x-show="page === 'pipeline'" class="flex flex-col h-full page-content overflow-y-auto scrollable">
+      <div class="px-6 py-5">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h1 class="text-slate-800 text-xl font-semibold cjk" x-text="t('dashboard.pipelineMonitor')"></h1>
+            <p class="text-slate-400 text-sm" x-text="t('dashboard.pipelineSubtitle')"></p>
+          </div>
+          <button @click="loadPipeline()"
+                  class="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"/>
+            </svg>
+            <span class="cjk" x-text="t('common.refresh')"></span>
+          </button>
+        </div>
+
+        <!-- Loading -->
+        <div x-show="pipelineLoading" class="flex items-center justify-center py-16">
+          <div class="spinner"></div>
+        </div>
+
+        <!-- Job grid -->
+        <div x-show="!pipelineLoading" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+          <template x-for="job in pipelineJobs" :key="job.name">
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+              <div class="flex items-start justify-between mb-3">
+                <div>
+                  <h3 class="text-slate-800 font-semibold text-sm cjk" x-text="jobDisplayName(job.name)"></h3>
+                  <p class="text-slate-400 text-xs" x-text="job.name"></p>
+                </div>
+                <!-- Status badge -->
+                <span class="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full font-medium"
+                      :class="jobStatusClass(job.status)">
+                  <span x-show="job.status === 'running'" class="w-1.5 h-1.5 rounded-full bg-current pulse-dot"></span>
+                  <svg x-show="job.status === 'complete'" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                  </svg>
+                  <span class="cjk" x-text="jobStatusLabel(job.status)"></span>
+                </span>
+              </div>
+
+              <!-- Progress -->
+              <div x-show="job.total > 0">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs text-slate-500">
+                    <span x-text="(job.ok || 0).toLocaleString()"></span>
+                    / <span x-text="(job.total || 0).toLocaleString()"></span>
+                  </span>
+                  <span class="text-xs font-semibold" :class="job.status === 'running' ? 'text-teal-600' : 'text-slate-600'"
+                        x-text="(job.pct || 0).toFixed(1) + '%'"></span>
+                </div>
+                <div class="progress-track mb-2">
+                  <div class="progress-fill"
+                       :class="job.status === 'running' ? 'bg-teal-500' : job.status === 'complete' ? 'bg-emerald-500' : job.status === 'failed' ? 'bg-red-400' : 'bg-slate-300'"
+                       :style="'width:' + (job.pct || 0) + '%'"></div>
+                </div>
+              </div>
+
+              <!-- Stats row -->
+              <div class="flex items-center gap-3 text-xs text-slate-500">
+                <span x-show="job.elapsed_s">
+                  ⏱ <span x-text="formatTime(job.elapsed_s)"></span>
+                </span>
+                <span x-show="job.eta_s" class="text-teal-600">
+                  ETA: <span x-text="formatTime(job.eta_s)"></span>
+                </span>
+                <span x-show="job.status === 'complete'" class="text-emerald-600 font-medium cjk" x-text="t('dashboard.completed')"></span>
+                <span x-show="job.status === 'pending'" class="text-slate-400 cjk" x-text="t('dashboard.idle')"></span>
+              </div>
+            </div>
+          </template>
+
+          <!-- Empty -->
+          <div x-show="!pipelineLoading && pipelineJobs.length === 0"
+               class="col-span-full text-center py-16">
+            <svg class="w-12 h-12 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            </svg>
+            <p class="text-slate-500 cjk" x-text="t('dashboard.noPipeline')"></p>
+            <button @click="loadPipeline()" class="mt-3 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm cjk hover:bg-teal-700 transition-colors" x-text="t('dashboard.loadPipeline')"></button>
+          </div>
+        </div>
+
+        <!-- System health -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5">
+          <h3 class="text-slate-700 font-semibold cjk text-sm mb-4" x-text="t('dashboard.health')"></h3>
+          <div class="flex flex-wrap gap-6">
+            <template x-for="service in systemHealth" :key="service.name">
+              <div class="flex items-center gap-2">
+                <div class="w-2.5 h-2.5 rounded-full"
+                     :class="service.status === 'ok' ? 'bg-emerald-500' : service.status === 'checking' ? 'bg-amber-400 pulse-dot' : 'bg-red-500'"></div>
+                <span class="text-sm font-medium text-slate-700" x-text="service.name"></span>
+                <span class="text-xs text-slate-400 cjk"
+                      x-text="service.status === 'ok' ? t('system.ok') : service.status === 'checking' ? t('system.checking') : t('system.error')"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE: UPLOAD ===== -->
+    <div x-show="page === 'upload'" class="flex flex-col h-full page-content overflow-y-auto scrollable">
+      <div class="px-6 py-5 max-w-5xl w-full mx-auto">
+        <div class="mb-6">
+          <h1 class="text-slate-800 text-xl font-semibold cjk" x-text="t('upload.title')"></h1>
+          <p class="text-slate-400 text-sm" x-text="t('upload.subtitle')"></p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Wizard form -->
+          <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+            <!-- Doc type -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1 cjk" x-text="t('upload.docType')"></label>
+              <select x-model="upload.docType" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700">
+                <option value="book" x-text="t('upload.docBook')"></option>
+                <option value="manuscript" x-text="t('upload.docManuscript')"></option>
+                <option value="article" x-text="t('upload.docArticle')"></option>
+                <option value="image" x-text="t('upload.docImage')"></option>
+                <option value="other" x-text="t('upload.docOther')"></option>
+              </select>
+            </div>
+
+            <!-- OCR required toggle -->
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-medium text-slate-600 cjk" x-text="t('upload.ocrRequired')"></label>
+              <button @click="upload.ocrRequired = !upload.ocrRequired"
+                      class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200"
+                      :class="upload.ocrRequired ? 'bg-teal-600' : 'bg-slate-300'">
+                <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 shadow"
+                      :class="upload.ocrRequired ? 'translate-x-6' : 'translate-x-1'"></span>
+              </button>
+            </div>
+
+            <!-- OCR model -->
+            <div x-show="upload.ocrRequired">
+              <label class="block text-xs font-medium text-slate-600 mb-1 cjk" x-text="t('upload.ocrModel')"></label>
+              <select x-model="upload.ocrModel" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700">
+                <option value="qwen">Qwen-VL-OCR</option>
+                <option value="deepseek">DeepSeek-OCR</option>
+                <option value="custom" x-text="t('upload.customOcr')"></option>
+              </select>
+            </div>
+
+            <!-- Custom API fields -->
+            <div x-show="upload.ocrRequired && upload.ocrModel === 'custom'" class="space-y-2 bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1" x-text="t('upload.customBaseUrl')"></label>
+                <input x-model="upload.customBaseUrl" type="text" placeholder="https://api.example.com/v1"
+                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1" x-text="t('upload.customKey')"></label>
+                <input x-model="upload.customKey" type="password" placeholder="sk-…"
+                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1" x-text="t('upload.customModel')"></label>
+                <input x-model="upload.customModel" type="text" placeholder="my-vision-model"
+                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700" />
+              </div>
+            </div>
+
+            <!-- Language -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1 cjk" x-text="t('upload.language')"></label>
+              <select x-model="upload.language" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700">
+                <option value="chinese" x-text="t('upload.langChinese')"></option>
+                <option value="japanese" x-text="t('upload.langJapanese')"></option>
+                <option value="english" x-text="t('upload.langEnglish')"></option>
+                <option value="arabic" x-text="t('upload.langArabic')"></option>
+              </select>
+            </div>
+
+            <!-- Tier -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1 cjk" x-text="t('upload.tier')"></label>
+              <select x-model="upload.tier" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700">
+                <option value="primary" x-text="t('search.primary')"></option>
+                <option value="secondary" x-text="t('search.secondary')"></option>
+              </select>
+            </div>
+
+            <!-- File picker -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1 cjk" x-text="t('upload.file')"></label>
+              <div @click="$refs.fileInput.click()"
+                   @dragover.prevent @drop.prevent="upload.file = $event.dataTransfer.files[0]"
+                   class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-teal-400 transition-colors">
+                <input x-ref="fileInput" type="file" class="hidden"
+                       accept=".pdf,.epub,.txt,.md,.png,.jpg,.jpeg,.webp,.tif,.tiff"
+                       @change="upload.file = $event.target.files[0]" />
+                <p x-show="!upload.file" class="text-slate-400 text-sm cjk" x-text="t('upload.dropHint')"></p>
+                <p x-show="upload.file" class="text-teal-700 text-sm font-medium" x-text="upload.file ? upload.file.name : ''"></p>
+              </div>
+            </div>
+
+            <button @click="startUpload()"
+                    :disabled="!upload.file || upload.submitting"
+                    class="w-full py-2.5 rounded-lg font-semibold text-white transition-colors flex items-center justify-center gap-2"
+                    :class="(!upload.file || upload.submitting) ? 'bg-slate-300 cursor-not-allowed' : 'bg-teal-600 hover:bg-teal-700'">
+              <span x-show="upload.submitting" class="spinner" style="width:16px;height:16px;border-width:2px;"></span>
+              <span class="cjk" x-text="t('upload.start')"></span>
+            </button>
+          </div>
+
+          <!-- Jobs list -->
+          <div class="bg-white rounded-xl border border-slate-200 p-5">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-slate-700 font-semibold text-sm cjk" x-text="t('upload.jobs')"></h3>
+              <button @click="loadUploadJobs()" class="text-slate-400 hover:text-slate-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"/>
+                </svg>
+              </button>
+            </div>
+            <div x-show="uploadJobs.length === 0" class="text-center py-8 text-slate-400 text-sm cjk" x-text="t('upload.noJobs')"></div>
+            <div class="space-y-3">
+              <template x-for="job in uploadJobs" :key="job.id">
+                <div class="border border-slate-200 rounded-lg p-3">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-sm font-medium text-slate-700 truncate cjk" x-text="job.filename"></span>
+                    <div class="flex items-center gap-1.5 flex-shrink-0">
+                      <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                            :class="uploadStatusClass(job.status)" x-text="job.status"></span>
+                      <button x-show="job.status !== 'running'"
+                              @click="deleteUploadJob(job.id)"
+                              :title="t('upload.delete')"
+                              class="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+                    <span x-text="t('upload.stage') + ': ' + (job.stage || '-')"></span>
+                    <span x-text="(job.pct || 0).toFixed(0) + '%'"></span>
+                  </div>
+                  <div class="progress-track">
+                    <div class="progress-fill"
+                         :class="job.status === 'failed' ? 'bg-red-400' : job.status === 'awaiting_review' || job.status === 'indexed' ? 'bg-emerald-500' : 'bg-teal-500'"
+                         :style="'width:' + (job.pct || 0) + '%'"></div>
+                  </div>
+                  <div x-show="job.error" class="text-xs text-red-500 mt-1" x-text="job.error"></div>
+                  <div x-show="job.status === 'awaiting_review'" class="mt-2">
+                    <button @click="page='ocrhitl'; selectHitlDoc(job.document_id)"
+                            class="text-xs text-teal-600 hover:text-teal-800 font-medium cjk">→ <span x-text="t('ocrhitl.title')"></span></button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE: OCR HITL FUSION ===== -->
+    <div x-show="page === 'ocrhitl'" class="flex h-full page-content overflow-hidden">
+      <!-- Left: awaiting-review docs + pages -->
+      <div class="w-72 flex-shrink-0 bg-slate-900 flex flex-col h-full border-r border-slate-700">
+        <div class="px-4 py-4 border-b border-slate-700 flex items-center justify-between">
+          <h2 class="text-white font-semibold cjk text-sm" x-text="t('ocrhitl.title')"></h2>
+          <button @click="loadHitlDocs()" class="text-slate-400 hover:text-white">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"/>
+            </svg>
+          </button>
+        </div>
+        <div class="flex-1 scrollable">
+          <template x-for="doc in hitlDocs" :key="doc.id">
+            <div>
+              <div class="queue-item px-4 py-2.5 border-b border-slate-800"
+                   :class="hitlDoc && hitlDoc.id === doc.id ? 'active' : ''"
+                   @click="selectHitlDoc(doc.id)">
+                <div class="text-white text-xs font-medium truncate cjk" x-text="doc.title || doc.id"></div>
+                <div class="text-slate-400 text-xs mt-0.5">
+                  <span x-text="doc.page_count"></span> <span x-text="t('upload.pages')"></span> · <span x-text="doc.status"></span>
+                </div>
+              </div>
+              <!-- Pages of the selected doc -->
+              <div x-show="hitlDoc && hitlDoc.id === doc.id" class="bg-slate-950">
+                <template x-for="pg in hitlPages" :key="pg.page_id">
+                  <div class="px-6 py-2 border-b border-slate-800 cursor-pointer hover:bg-slate-800 flex items-center justify-between"
+                       :class="hitlPage && hitlPage.page_id === pg.page_id ? 'bg-teal-900' : ''"
+                       @click="selectHitlPage(pg.page_id)">
+                    <span class="text-slate-300 text-xs">p<span x-text="pg.page_index"></span></span>
+                    <span class="text-slate-500 text-xs" x-text="pg.fusion_status || '-'"></span>
+                  </div>
+                </template>
+                <div x-show="hitlPages.length === 0" class="px-6 py-3 text-slate-500 text-xs cjk" x-text="t('ocrhitl.noPages')"></div>
+              </div>
+            </div>
+          </template>
+          <div x-show="hitlDocs.length === 0" class="text-center py-12 text-slate-500 text-sm cjk" x-text="t('ocrhitl.selectDoc')"></div>
+        </div>
+      </div>
+
+      <!-- Right: 4-column compare -->
+      <div class="flex-1 flex flex-col h-full overflow-hidden bg-slate-50">
+        <div x-show="!hitlPage" class="flex flex-col items-center justify-center h-full text-center">
+          <div class="watermark-char mb-4 opacity-30 select-none">校</div>
+          <p class="text-slate-400 text-sm cjk" x-text="t('ocrhitl.subtitle')"></p>
+        </div>
+
+        <div x-show="hitlPage" class="flex flex-col h-full">
+          <div class="flex-1 overflow-y-auto scrollable p-4">
+            <div class="grid gap-4" :style="'grid-template-columns: repeat(' + (2 + (hitlOcr.engines ? hitlOcr.engines.length : 0)) + ', minmax(0, 1fr))'">
+              <!-- Original image -->
+              <div class="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col">
+                <div class="px-3 py-2 border-b border-slate-200 text-xs font-semibold text-slate-500 cjk" x-text="t('ocrhitl.original')"></div>
+                <div class="p-2 flex-1 overflow-auto scrollable" style="max-height: 60vh;">
+                  <img x-show="hitlOcr.image_url" :src="hitlOcr.image_url" class="w-full rounded" />
+                </div>
+              </div>
+              <!-- Engine columns -->
+              <template x-for="eng in (hitlOcr.engines || [])" :key="eng.key">
+                <div class="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col">
+                  <div class="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-600" x-text="eng.label"></span>
+                    <button @click="applyFuse(eng.key)"
+                            class="text-xs text-teal-600 hover:text-teal-800 cjk" x-text="t('ocrhitl.useEngine')"></button>
+                  </div>
+                  <div class="p-3 flex-1 overflow-auto scrollable" style="max-height: 60vh;">
+                    <p class="cjk text-xs text-slate-700 leading-relaxed whitespace-pre-wrap" x-text="eng.text || '（無）'"></p>
+                  </div>
+                  <div class="px-3 py-1.5 border-t border-slate-100 text-xs text-slate-400">
+                    <span x-text="eng.char_count + ' chars'"></span>
+                  </div>
+                </div>
+              </template>
+              <!-- Preference column -->
+              <div class="bg-white rounded-xl border border-teal-200 overflow-hidden flex flex-col">
+                <div class="px-3 py-2 border-b border-teal-200 bg-teal-50 text-xs font-semibold text-teal-700 cjk" x-text="t('ocrhitl.preference')"></div>
+                <div class="p-3 flex-1 flex flex-col gap-2">
+                  <div class="flex gap-1 flex-wrap">
+                    <button @click="applyFuse('auto')" class="text-xs px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 cjk" x-text="t('ocrhitl.autoFuse')"></button>
+                  </div>
+                  <label class="text-xs text-slate-500 cjk" x-text="t('ocrhitl.fusedText')"></label>
+                  <textarea x-model="hitlOcr.fused" rows="8"
+                            class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs cjk leading-relaxed resize-y focus:outline-none focus:ring-1 focus:ring-teal-500"></textarea>
+                  <button @click="applyFuse('manual')" class="text-xs py-1.5 rounded bg-teal-600 hover:bg-teal-700 text-white font-medium cjk" x-text="t('ocrhitl.saveFusion')"></button>
+                  <label class="text-xs text-slate-500 mt-2 cjk" x-text="t('ocrhitl.correctionNote')"></label>
+                  <textarea x-model="hitlOcr.note" rows="2"
+                            class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs cjk resize-none focus:outline-none focus:ring-1 focus:ring-teal-500"></textarea>
+                  <button @click="submitOcrCorrection()" class="text-xs py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium cjk" x-text="t('ocrhitl.submitCorrection')"></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Action bar -->
+          <div class="bg-white border-t border-slate-200 px-6 py-3 flex items-center gap-3">
+            <a :href="'/api/hitl/export/' + encodeURIComponent(hitlPage.page_id) + '?format=docx'" target="_blank"
+               class="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm cjk" x-text="t('ocrhitl.exportWord')"></a>
+            <a :href="'/api/hitl/export/' + encodeURIComponent(hitlPage.page_id) + '?format=pdf'" target="_blank"
+               class="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm cjk" x-text="t('ocrhitl.exportPdf')"></a>
+            <button @click="approveDocument()"
+                    class="ml-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium cjk" x-text="t('ocrhitl.approve')"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE: INTERACTIVE ===== -->
+    <div x-show="page === 'interactive'" class="flex h-full page-content overflow-hidden">
+      <!-- Left: indexed docs + pages -->
+      <div class="w-72 flex-shrink-0 bg-slate-900 flex flex-col h-full border-r border-slate-700">
+        <div class="px-4 py-4 border-b border-slate-700 flex items-center justify-between">
+          <h2 class="text-white font-semibold cjk text-sm" x-text="t('nav.interactive')"></h2>
+          <button @click="loadInteractiveDocs()" class="text-slate-400 hover:text-white">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"/>
+            </svg>
+          </button>
+        </div>
+        <div class="flex-1 scrollable">
+          <template x-for="doc in interactiveDocs" :key="doc.id">
+            <div>
+              <div class="queue-item px-4 py-2.5 border-b border-slate-800"
+                   :class="iaDoc && iaDoc.id === doc.id ? 'active' : ''"
+                   @click="selectInteractiveDoc(doc.id)">
+                <div class="text-white text-xs font-medium truncate cjk" x-text="doc.title || doc.id"></div>
+                <div class="text-slate-400 text-xs mt-0.5"><span x-text="doc.page_count"></span> <span x-text="t('interactive.pages')"></span></div>
+              </div>
+              <div x-show="iaDoc && iaDoc.id === doc.id" class="bg-slate-950">
+                <template x-for="pg in iaPages" :key="pg.page_id">
+                  <div class="px-6 py-2 border-b border-slate-800 cursor-pointer hover:bg-slate-800"
+                       :class="iaPage && iaPage.page_id === pg.page_id ? 'bg-teal-900' : ''"
+                       @click="selectInteractivePage(pg.page_id)">
+                    <span class="text-slate-300 text-xs">p<span x-text="pg.page_index"></span></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+          <div x-show="interactiveDocs.length === 0" class="text-center py-12 text-slate-500 text-sm cjk" x-text="t('interactive.selectDoc')"></div>
+        </div>
+      </div>
+
+      <!-- Center: image with hover overlays -->
+      <div class="flex-1 flex flex-col h-full overflow-hidden bg-slate-100">
+        <div x-show="!iaPage" class="flex flex-col items-center justify-center h-full text-center">
+          <div class="watermark-char mb-4 opacity-30 select-none">覽</div>
+          <p class="text-slate-400 text-sm cjk" x-text="t('interactive.hoverHint')"></p>
+        </div>
+        <div x-show="iaPage" class="flex-1 overflow-auto scrollable p-6 flex items-start justify-center">
+          <div class="relative inline-block" x-ref="iaImageWrap">
+            <img x-show="iaPage" :src="iaPage ? iaPage.image_url : ''" x-ref="iaImage"
+                 @load="iaImageLoaded()" class="max-w-full rounded shadow-lg block" />
+            <!-- Overlays -->
+            <template x-for="(region, idx) in (iaPage ? iaPage.regions : [])" :key="idx">
+              <div class="absolute border border-teal-400/40 hover:bg-teal-400/20 hover:border-teal-500 transition-colors cursor-pointer"
+                   :style="regionStyle(region)"
+                   @mouseenter="iaHover = region" @mouseleave="iaHover === region ? iaHover = null : null">
+              </div>
+            </template>
+            <!-- Hover callout -->
+            <div x-show="iaHover" x-transition
+                 class="absolute z-30 bg-slate-900 text-white text-xs rounded-lg px-3 py-2 max-w-xs shadow-xl pointer-events-none cjk leading-relaxed"
+                 :style="calloutStyle(iaHover)">
+              <span x-text="iaHover ? (iaHover.text || '（無文字）') : ''"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: comments + chat -->
+      <div x-show="iaPage" class="w-80 flex-shrink-0 bg-white border-l border-slate-200 flex flex-col h-full">
+        <!-- Ask panel -->
+        <div class="border-b border-slate-200 p-4">
+          <div class="flex gap-2">
+            <input x-model="iaAskQuery" @keydown.enter="askDocument()" type="text"
+                   :placeholder="t('interactive.ask')"
+                   class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm cjk focus:outline-none focus:ring-1 focus:ring-teal-500" />
+            <button @click="askDocument()" class="px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm cjk" x-text="t('interactive.send')"></button>
+          </div>
+          <div class="mt-3 space-y-2 max-h-48 overflow-y-auto scrollable">
+            <template x-for="hit in iaAnswers" :key="hit.chunk_id">
+              <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                <p class="text-xs text-slate-700 cjk leading-relaxed line-clamp-4" x-text="hit.text"></p>
+                <div class="text-xs text-slate-400 mt-1 cjk" x-text="hit.citation || ''"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+        <!-- Comments -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-200 text-xs font-semibold text-slate-500 cjk" x-text="t('interactive.comments')"></div>
+          <div class="flex-1 overflow-y-auto scrollable p-4 space-y-2">
+            <template x-for="c in iaComments" :key="c.id">
+              <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                <p class="text-xs text-slate-700 cjk" x-text="c.text"></p>
+                <div class="text-xs text-slate-400 mt-1" x-text="c.author"></div>
+              </div>
+            </template>
+            <div x-show="iaComments.length === 0" class="text-center text-slate-400 text-xs cjk py-4" x-text="t('interactive.noComments')"></div>
+          </div>
+          <div class="p-3 border-t border-slate-200 flex gap-2">
+            <input x-model="iaCommentText" @keydown.enter="addComment()" type="text"
+                   :placeholder="t('interactive.addComment')"
+                   class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm cjk focus:outline-none focus:ring-1 focus:ring-teal-500" />
+            <button @click="addComment()" class="px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm cjk" x-text="t('common.submit')"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ===== LOGIN MODAL ===== -->
+  <div x-show="showLoginModal"
+       class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop"
+       style="background: rgba(0,0,0,0.5);">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 modal-content">
+      <div class="px-6 pt-6 pb-4 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="text-slate-800 font-semibold cjk">Sign In</h3>
+        <button @click="showLoginModal = false; authError = null" class="text-slate-400 hover:text-slate-600">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+        <div x-show="authError" class="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2" x-text="authError"></div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Email</label>
+          <input x-model="loginEmail" type="email" placeholder="you@example.com"
+                 @keydown.enter="$refs.loginPwd.focus()"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Password</label>
+          <input x-ref="loginPwd" x-model="loginPassword" type="password" placeholder="••••••••"
+                 @keydown.enter="login()"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+        </div>
+      </div>
+      <div class="px-6 pb-6 flex gap-3 justify-end">
+        <button @click="showLoginModal = false; authError = null"
+                class="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 text-sm hover:bg-slate-50">Cancel</button>
+        <button @click="login()"
+                :disabled="authLoading || !loginEmail || !loginPassword"
+                class="px-5 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+          <span x-show="authLoading" class="spinner" style="width:14px;height:14px;border-width:2px;"></span>
+          Sign In
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CORRECTION MODAL ===== -->
+  <div x-show="showCorrectionModal"
+       class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop"
+       style="background: rgba(0,0,0,0.5);">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 modal-content">
+      <div class="px-6 pt-6 pb-4 border-b border-slate-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-slate-800 font-semibold cjk" x-text="t('review.correct')"></h3>
+          <button @click="showCorrectionModal = false" class="text-slate-400 hover:text-slate-600 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="px-6 py-4 space-y-4">
+        <!-- Chunk ID display -->
+        <div x-show="correction.chunk_id">
+          <label class="block text-xs font-medium text-slate-500 mb-1 cjk"><span x-text="t('review.paragraph')"></span> ID</label>
+          <div class="text-xs text-slate-500 font-mono bg-slate-50 rounded px-2 py-1" x-text="correction.chunk_id"></div>
+        </div>
+        <!-- Corrected text -->
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1 cjk" x-text="t('ocrhitl.correctionText')"></label>
+          <textarea x-model="correction.corrected_text"
+                    rows="5"
+                    :placeholder="t('ocrhitl.correctionText') + '…'"
+                    class="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-700 cjk text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-y"></textarea>
+        </div>
+        <!-- Problem class -->
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1 cjk" x-text="t('ocrhitl.problemClass')"></label>
+          <select x-model="correction.problem_class"
+                  class="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+            <option value="" x-text="t('ocrhitl.selectProblem')"></option>
+            <option value="RARE_GLYPH">RARE_GLYPH</option>
+            <option value="DEGRADATION">DEGRADATION</option>
+            <option value="LAYOUT_AMBIGUITY">LAYOUT_AMBIGUITY</option>
+            <option value="READING_ORDER">READING_ORDER</option>
+            <option value="KANBUN_KUNTEN">KANBUN_KUNTEN</option>
+          </select>
+        </div>
+        <!-- Notes -->
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1 cjk" x-text="t('ocrhitl.correctionNote')"></label>
+          <textarea x-model="correction.notes"
+                    rows="2"
+                    :placeholder="t('ocrhitl.correctionNote')"
+                    class="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-700 cjk text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"></textarea>
+        </div>
+      </div>
+      <div class="px-6 pb-6 flex gap-3 justify-end">
+        <button @click="showCorrectionModal = false"
+                class="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 text-sm hover:bg-slate-50 transition-colors cjk"
+                x-text="t('common.cancel')">
+        </button>
+        <button @click="submitCorrection()"
+                class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium cjk transition-colors"
+                x-text="t('ocrhitl.submitCorrection')">
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TOAST NOTIFICATIONS ===== -->
+  <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+    <template x-for="toast in toasts" :key="toast.id">
+      <div class="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium toast-enter"
+           :class="toast.type === 'success' ? 'bg-emerald-600 text-white' : toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-slate-800 text-white'">
+        <svg x-show="toast.type === 'success'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>
+        <svg x-show="toast.type === 'error'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+        </svg>
+        <span class="cjk" x-text="toast.message"></span>
+      </div>
+    </template>
+  </div>
+
+  <script>
+    function app() {
+      return {
+        page: 'search',
+        sidebarExpanded: false,
+
+        // i18n
+        locale: 'zh',
+        i18n: {},
+
+        // Upload
+        upload: {
+          docType: 'book', ocrRequired: true, ocrModel: 'qwen',
+          customBaseUrl: '', customKey: '', customModel: '',
+          language: 'chinese', tier: 'primary', file: null, submitting: false,
+        },
+        uploadJobs: [],
+        _uploadPoll: null,
+
+        // OCR HITL fusion
+        hitlDocs: [],
+        hitlDoc: null,
+        hitlPages: [],
+        hitlPage: null,
+        hitlOcr: {},
+
+        // Interactive
+        interactiveDocs: [],
+        iaDoc: null,
+        iaPages: [],
+        iaPage: null,
+        iaHover: null,
+        iaScale: 1,
+        iaComments: [],
+        iaCommentText: '',
+        iaAskQuery: '',
+        iaAnswers: [],
+
+        // Search
+        query: '',
+        searchResults: [],
+        searchLoading: false,
+        searchError: null,
+        searchMode: 'hybrid',
+        searchIntent: null,
+        searchBm25Ready: false,
+        searchDuration: null,
+        filters: { tier: 'both', lang: 'all', top_k: 10, expand_keywords: true },
+        _expandedSet: [],
+
+        // HITL
+        reviewQueue: [],
+        reviewLoading: false,
+        selectedReviewItem: null,
+        pageDetail: null,
+        activeOcrTab: 'fused',
+        showCorrectionModal: false,
+        correction: { chunk_id: '', corrected_text: '', problem_class: '', notes: '' },
+
+        // Admin
+        stats: null,
+        statsLoading: false,
+        charts: {},
+
+        // Pipeline
+        pipelineJobs: [],
+        pipelineLoading: false,
+        systemHealth: [
+          { name: 'Neo4j', status: 'checking' },
+          { name: 'MinIO', status: 'checking' },
+          { name: 'Silra API', status: 'checking' },
+        ],
+
+        // Auth
+        token: localStorage.getItem('authToken') || null,
+        currentUser: null,
+        showLoginModal: false,
+        loginEmail: '',
+        loginPassword: '',
+        authLoading: false,
+        authError: null,
+
+        // Toast
+        toasts: [],
+        _toastCounter: 0,
+
+        // OCR tabs config — labels are getters so they re-evaluate when i18n changes
+        get ocrTabs() {
+          return [
+            { key: 'paddle', label: 'Paddle OCR' },
+            { key: 'qwen_vl', label: 'Qwen-VL' },
+            { key: 'deepseek', label: 'DeepSeek' },
+            { key: 'fused', label: this.t('review.fusedText') },
+          ];
+        },
+
+        async init() {
+          // Load saved locale (default zh)
+          const saved = localStorage.getItem('locale') || 'zh';
+          await this.setLocale(saved);
+          // Restore session if token exists (graceful — auth may be optional)
+          if (this.token) {
+            try {
+              const res = await this._authFetch('/api/auth/me');
+              if (res.ok) {
+                this.currentUser = await res.json();
+              } else if (res.status === 401 || res.status === 404) {
+                this.token = null;
+                localStorage.removeItem('authToken');
+              }
+            } catch (e) {
+              // Server unreachable or auth not enabled — continue as guest
+            }
+          }
+          // Check system health in background
+          this.checkSystemHealth();
+          // Load stats if on dashboard
+          if (this.page === 'dashboard') {
+            await this.loadStats();
+          }
+        },
+
+        navigateTo(p) {
+          this.page = p;
+          this.$nextTick(() => {
+            if (p === 'dashboard' && !this.stats) this.loadStats();
+            if (p === 'review' && this.reviewQueue.length === 0) this.loadReviewQueue();
+            if (p === 'pipeline') this.loadPipeline();
+            if (p === 'upload') this.loadUploadJobs();
+            if (p === 'ocrhitl') this.loadHitlDocs();
+            if (p === 'interactive') this.loadInteractiveDocs();
+          });
+        },
+
+        // ---- AUTH ----
+        _authFetch(url, opts = {}) {
+          const headers = { ...(opts.headers || {}) };
+          if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+          return fetch(url, { ...opts, headers });
+        },
+
+        async login() {
+          this.authLoading = true;
+          this.authError = null;
+          const fd = new FormData();
+          fd.append('username', this.loginEmail);
+          fd.append('password', this.loginPassword);
+          try {
+            const res = await fetch('/api/auth/login', { method: 'POST', body: fd });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.detail || `HTTP ${res.status}`);
+            }
+            const data = await res.json();
+            this.token = data.access_token;
+            localStorage.setItem('authToken', this.token);
+            const meRes = await this._authFetch('/api/auth/me');
+            if (meRes.ok) this.currentUser = await meRes.json();
+            this.showLoginModal = false;
+            this.loginEmail = '';
+            this.loginPassword = '';
+            this.showToast(this.t('toast.loggedIn') || 'Logged in', 'success');
+          } catch (e) {
+            this.authError = e.message;
+          } finally {
+            this.authLoading = false;
+          }
+        },
+
+        logout() {
+          this.token = null;
+          this.currentUser = null;
+          localStorage.removeItem('authToken');
+          this.showToast(this.t('toast.loggedOut') || 'Logged out', 'info');
+        },
+
+        // ---- I18N ----
+        async setLocale(loc) {
+          this.locale = loc;
+          localStorage.setItem('locale', loc);
+          try {
+            const res = await fetch(`/static/i18n/${loc}.json`);
+            this.i18n = await res.json();
+          } catch (e) {
+            this.i18n = {};
+          }
+          // RTL for Arabic
+          const isRtl = loc === 'ar';
+          document.documentElement.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
+          document.documentElement.setAttribute('lang', loc);
+          // Redraw charts with translated labels if stats are loaded
+          if (this.stats) {
+            await this.$nextTick();
+            this.drawCharts();
+          }
+        },
+
+        t(key) {
+          return (this.i18n && this.i18n[key]) || key;
+        },
+
+        // ---- UPLOAD ----
+        async startUpload() {
+          if (!this.upload.file) return;
+          this.upload.submitting = true;
+          const fd = new FormData();
+          fd.append('file', this.upload.file);
+          fd.append('doc_type', this.upload.docType);
+          fd.append('ocr_required', this.upload.ocrRequired ? 'true' : 'false');
+          fd.append('ocr_model', this.upload.ocrModel);
+          fd.append('language', this.upload.language);
+          fd.append('tier', this.upload.tier);
+          if (this.upload.ocrModel === 'custom') {
+            fd.append('custom_base_url', this.upload.customBaseUrl);
+            fd.append('custom_api_key', this.upload.customKey);
+            fd.append('custom_model', this.upload.customModel);
+          }
+          try {
+            const res = await this._authFetch('/api/upload', { method: 'POST', body: fd });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.detail || `HTTP ${res.status}`);
+            }
+            this.showToast(this.t('toast.uploadStarted'), 'success');
+            this.upload.file = null;
+            this.$refs.fileInput.value = '';
+            await this.loadUploadJobs();
+            this.startUploadPolling();
+          } catch (e) {
+            this.showToast(this.t('toast.uploadFailed') + e.message, 'error');
+          } finally {
+            this.upload.submitting = false;
+          }
+        },
+
+        async loadUploadJobs() {
+          try {
+            const res = await this._authFetch('/api/upload/jobs?limit=30');
+            const data = await res.json();
+            this.uploadJobs = data.jobs || [];
+            // Keep polling while any job is active
+            if (this.uploadJobs.some(j => j.status === 'running' || j.status === 'queued')) {
+              this.startUploadPolling();
+            }
+          } catch (e) { /* ignore */ }
+        },
+
+        startUploadPolling() {
+          if (this._uploadPoll) return;
+          this._uploadPoll = setInterval(async () => {
+            await this.loadUploadJobs();
+            if (!this.uploadJobs.some(j => j.status === 'running' || j.status === 'queued')) {
+              clearInterval(this._uploadPoll);
+              this._uploadPoll = null;
+            }
+          }, 3000);
+        },
+
+        uploadStatusClass(status) {
+          const map = {
+            queued: 'bg-slate-100 text-slate-500',
+            running: 'bg-teal-100 text-teal-700',
+            awaiting_review: 'bg-amber-100 text-amber-700',
+            approved: 'bg-blue-100 text-blue-700',
+            indexed: 'bg-emerald-100 text-emerald-700',
+            failed: 'bg-red-100 text-red-600',
+          };
+          return map[status] || 'bg-slate-100 text-slate-500';
+        },
+
+        async deleteUploadJob(jobId) {
+          if (!confirm(this.t('upload.deleteConfirm'))) return;
+          try {
+            const res = await this._authFetch(`/api/upload/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.detail || `HTTP ${res.status}`);
+            }
+            this.uploadJobs = this.uploadJobs.filter(j => j.id !== jobId);
+            this.showToast(this.t('toast.jobDeleted'), 'success');
+          } catch (e) {
+            this.showToast(this.t('toast.jobDeleteFailed') + e.message, 'error');
+          }
+        },
+
+        // ---- OCR HITL FUSION ----
+        async loadHitlDocs() {
+          try {
+            const res = await fetch('/api/documents?status=awaiting_review&limit=100');
+            const data = await res.json();
+            this.hitlDocs = data.documents || [];
+          } catch (e) { this.hitlDocs = []; }
+        },
+
+        async selectHitlDoc(docId) {
+          this.page = 'ocrhitl';
+          if (!this.hitlDocs.length) await this.loadHitlDocs();
+          this.hitlDoc = this.hitlDocs.find(d => d.id === docId) || { id: docId };
+          this.hitlPage = null;
+          this.hitlOcr = {};
+          try {
+            const res = await fetch(`/api/documents/${encodeURIComponent(docId)}/pages`);
+            const data = await res.json();
+            this.hitlPages = data.pages || [];
+          } catch (e) { this.hitlPages = []; }
+        },
+
+        async selectHitlPage(pageId) {
+          try {
+            const res = await this._authFetch(`/api/hitl/ocr/${encodeURIComponent(pageId)}`);
+            const data = await res.json();
+            this.hitlOcr = { ...data, note: '' };
+            this.hitlPage = { page_id: pageId };
+          } catch (e) { this.showToast(this.t('toast.failedLoadPage'), 'error'); }
+        },
+
+        async applyFuse(choice) {
+          if (!this.hitlPage) return;
+          const body = { page_id: this.hitlPage.page_id, choice };
+          if (choice === 'manual') body.manual_text = this.hitlOcr.fused || '';
+          try {
+            const res = await this._authFetch('/api/hitl/fuse', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            // Re-fetch to reflect the new fused text (auto/engine choices)
+            if (choice !== 'manual') await this.selectHitlPage(this.hitlPage.page_id);
+            this.showToast(this.t('toast.fusionSaved'), 'success');
+          } catch (e) { this.showToast(this.t('toast.fusionFailed'), 'error'); }
+        },
+
+        async submitOcrCorrection() {
+          if (!this.hitlPage) return;
+          try {
+            await this._authFetch('/api/hitl/ocr-correct', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                page_id: this.hitlPage.page_id,
+                corrected_text: this.hitlOcr.fused || '',
+                notes: this.hitlOcr.note || '',
+              }),
+            });
+            this.showToast(this.t('toast.correctionSubmitted'), 'success');
+          } catch (e) { this.showToast(this.t('toast.correctionFailed'), 'error'); }
+        },
+
+        async approveDocument() {
+          if (!this.hitlDoc) return;
+          try {
+            const res = await this._authFetch('/api/hitl/ocr/approve', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ document_id: this.hitlDoc.id }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            this.showToast(this.t('toast.approved'), 'success');
+            this.hitlDocs = this.hitlDocs.filter(d => d.id !== this.hitlDoc.id);
+            this.hitlDoc = null; this.hitlPage = null; this.hitlPages = [];
+          } catch (e) { this.showToast(this.t('toast.approveFailed'), 'error'); }
+        },
+
+        // ---- INTERACTIVE ----
+        async loadInteractiveDocs() {
+          try {
+            const res = await fetch('/api/documents?status=indexed&limit=200');
+            const data = await res.json();
+            this.interactiveDocs = data.documents || [];
+          } catch (e) { this.interactiveDocs = []; }
+        },
+
+        async selectInteractiveDoc(docId) {
+          this.iaDoc = this.interactiveDocs.find(d => d.id === docId) || { id: docId };
+          this.iaPage = null;
+          try {
+            const res = await fetch(`/api/documents/${encodeURIComponent(docId)}/pages?only_with_layout=true`);
+            const data = await res.json();
+            this.iaPages = data.pages || [];
+          } catch (e) { this.iaPages = []; }
+        },
+
+        async selectInteractivePage(pageId) {
+          this.iaHover = null;
+          try {
+            const res = await fetch(`/api/interactive/page/${encodeURIComponent(pageId)}`);
+            this.iaPage = await res.json();
+            this.iaComments = this.iaPage.comments || [];
+            this.iaAnswers = [];
+            this.iaScale = 1;
+          } catch (e) { this.showToast(this.t('toast.failedLoadPage'), 'error'); }
+        },
+
+        iaImageLoaded() {
+          const img = this.$refs.iaImage;
+          if (img && img.naturalWidth) {
+            this.iaScale = img.clientWidth / img.naturalWidth;
+          }
+        },
+
+        regionStyle(region) {
+          const b = region.bbox || [0, 0, 0, 0];
+          const s = this.iaScale || 1;
+          return `left:${b[0]*s}px; top:${b[1]*s}px; width:${b[2]*s}px; height:${b[3]*s}px;`;
+        },
+
+        calloutStyle(region) {
+          if (!region) return '';
+          const b = region.bbox || [0, 0, 0, 0];
+          const s = this.iaScale || 1;
+          return `left:${b[0]*s}px; top:${(b[1]+b[3])*s + 4}px;`;
+        },
+
+        async addComment() {
+          if (!this.iaCommentText.trim() || !this.iaPage) return;
+          try {
+            await this._authFetch('/api/interactive/comment', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ page_id: this.iaPage.page_id, text: this.iaCommentText }),
+            });
+            this.iaComments.push({ id: Date.now(), text: this.iaCommentText, author: 'anonymous' });
+            this.iaCommentText = '';
+          } catch (e) { this.showToast(this.t('toast.commentFailed'), 'error'); }
+        },
+
+        async askDocument() {
+          if (!this.iaAskQuery.trim() || !this.iaDoc) return;
+          try {
+            const res = await this._authFetch('/api/interactive/ask', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ document_id: this.iaDoc.id, query: this.iaAskQuery, top_k: 5 }),
+            });
+            const data = await res.json();
+            this.iaAnswers = data.hits || [];
+          } catch (e) { this.showToast(this.t('toast.askFailed'), 'error'); }
+        },
+
+        // ---- SEARCH ----
+        get primaryResults() {
+          return this.searchResults.filter(r => r.document_tier === 'primary');
+        },
+        get secondaryResults() {
+          return this.searchResults.filter(r => r.document_tier === 'secondary');
+        },
+
+        toggleExpanded(chunkId) {
+          // Alpine reactivity workaround: use array
+          const idx = this._expandedSet.indexOf(chunkId);
+          if (idx === -1) {
+            this._expandedSet = [...this._expandedSet, chunkId];
+          } else {
+            this._expandedSet = this._expandedSet.filter(id => id !== chunkId);
+          }
+        },
+
+        isExpanded(chunkId) {
+          return this._expandedSet.includes(chunkId);
+        },
+
+        async doSearch() {
+          if (!this.query.trim()) return;
+          this.searchLoading = true;
+          this.searchError = null;
+          this.searchResults = [];
+          this.searchIntent = null;
+          this.searchDuration = null;
+          this._expandedSet = [];
+
+          const params = new URLSearchParams({
+            q: this.query,
+            mode: this.searchMode,
+            tier: this.filters.tier,
+            lang: this.filters.lang,
+            top_k: this.filters.top_k,
+            expand_keywords: this.filters.expand_keywords,
+          });
+
+          try {
+            const res = await fetch(`/api/search?${params}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            const data = await res.json();
+            this.searchResults = data.results || [];
+            this.searchIntent = data.intent || null;
+            this.searchBm25Ready = data.bm25_ready || false;
+            this.searchDuration = data.duration_ms || null;
+            if (this.searchResults.length === 0) {
+              this.searchError = null;
+            }
+          } catch (e) {
+            this.searchError = this.t('search.errorPrefix') + e.message;
+            this.searchResults = this._demoSearchResults();
+          } finally {
+            this.searchLoading = false;
+          }
+        },
+
+        _demoSearchResults() {
+          return [
+            {
+              rank: 1, score: 0.92, chunk_id: 'chunk_001',
+              document_title: '禮記', document_author: '孔子弟子', document_tier: 'primary',
+              chapter_title: '大同篇', section_title: '第一章',
+              citation: '禮記·禮運·大同', language: 'zh-classical',
+              text: '大道之行也，天下為公，選賢與能，講信修睦。故人不獨親其親，不獨子其子，使老有所終，壯有所用，幼有所長，矜、寡、孤、獨、廢疾者皆有所養。',
+              trust_score: 0.95,
+              keywords: ['大道', '天下', '為公', '選賢', '信睦'],
+              translation_canonical: '大道之行，天下為公。選拔賢能之人，倡導誠信修睦之風。',
+              translation_vernacular: '當大道暢行之時，天下是大家共有的。選拔有德有才的人，提倡誠信和睦的風氣。',
+            },
+            {
+              rank: 2, score: 0.87, chunk_id: 'chunk_002',
+              document_title: '孟子', document_author: '孟子', document_tier: 'primary',
+              chapter_title: '梁惠王上', section_title: null,
+              citation: '孟子·梁惠王上', language: 'zh-classical',
+              text: '老吾老，以及人之老；幼吾幼，以及人之幼；天下可運於掌。',
+              trust_score: 0.97,
+              keywords: ['老幼', '天下', '仁愛'],
+              translation_canonical: null,
+              translation_vernacular: null,
+            },
+            {
+              rank: 3, score: 0.78, chunk_id: 'chunk_003',
+              document_title: '儒家思想研究', document_author: '王明德', document_tier: 'secondary',
+              chapter_title: '第三章：大同理想', section_title: null,
+              citation: '王明德 (2018), 第3章', language: 'zh-modern',
+              text: '《禮記·禮運》中的「大同」理想，是儒家政治哲學的核心概念之一，體現了對社會和諧、天下公平的終極追求。',
+              trust_score: 0.82,
+              keywords: ['大同', '禮記', '儒家', '政治哲學'],
+              translation_canonical: null,
+              translation_vernacular: null,
+            },
+          ];
+        },
+
+        // ---- HITL REVIEW ----
+        async loadReviewQueue() {
+          this.reviewLoading = true;
+          try {
+            const res = await this._authFetch('/api/hitl/queue?max=30');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            this.reviewQueue = data.items || [];
+          } catch (e) {
+            // Demo data
+            this.reviewQueue = this._demoQueue();
+          } finally {
+            this.reviewLoading = false;
+          }
+        },
+
+        _demoQueue() {
+          return [
+            {
+              page_id: 'page_abc12345', document_title: '史記·本紀',
+              page_index: 42, problem_class: 'RARE_GLYPH', priority_score: 0.91,
+              decision: 'needs_review', inter_engine_cer: 0.23, cjk_validity_ratio: 0.78,
+            },
+            {
+              page_id: 'page_def67890', document_title: '漢書',
+              page_index: 7, problem_class: 'DEGRADATION', priority_score: 0.75,
+              decision: 'failed', inter_engine_cer: 0.45, cjk_validity_ratio: 0.61,
+            },
+            {
+              page_id: 'page_ghi11111', document_title: '論語集注',
+              page_index: 15, problem_class: 'KANBUN_KUNTEN', priority_score: 0.65,
+              decision: 'needs_review', inter_engine_cer: 0.18, cjk_validity_ratio: 0.85,
+            },
+            {
+              page_id: 'page_jkl22222', document_title: '資治通鑑',
+              page_index: 103, problem_class: 'READING_ORDER', priority_score: 0.58,
+              decision: 'needs_review', inter_engine_cer: 0.12, cjk_validity_ratio: 0.91,
+            },
+            {
+              page_id: 'page_mno33333', document_title: '二十四史',
+              page_index: 8, problem_class: 'LAYOUT_AMBIGUITY', priority_score: 0.45,
+              decision: 'needs_review', inter_engine_cer: 0.09, cjk_validity_ratio: 0.93,
+            },
+          ];
+        },
+
+        async selectReviewItem(item) {
+          this.selectedReviewItem = item;
+          this.pageDetail = null;
+          this.activeOcrTab = 'fused';
+          await this.loadPageDetail(item.page_id);
+        },
+
+        async loadPageDetail(pageId) {
+          try {
+            const res = await this._authFetch(`/api/hitl/page/${pageId}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            this.pageDetail = await res.json();
+          } catch (e) {
+            // Demo data
+            this.pageDetail = this._demoPageDetail(pageId);
+          }
+        },
+
+        _demoPageDetail(pageId) {
+          return {
+            page: {
+              page_id: pageId,
+              document_title: this.selectedReviewItem ? this.selectedReviewItem.document_title : '史記·本紀',
+              tier: 'primary', language: 'zh-classical',
+              page_index: this.selectedReviewItem ? this.selectedReviewItem.page_index : 42,
+              mode: 'ocr',
+            },
+            ocr: {
+              paddle: '帝曰：「汝能庸命巽朕位？」鯀哉！鯀哉！方命圮族。嶽曰：「試可乃已。」',
+              qwen_vl: '帝曰：「汝能庸命遜朕位？」鯀哉！鯀哉！方命圮族。嶽曰：「試可乃已。」',
+              deepseek: '帝曰：「汝能庸命巽朕位？」鯀哉！鯀哉！方命圮族。嶽曰：「試可乃已。」',
+              fused: '帝曰：「汝能庸命巽朕位？」鯀哉！鯀哉！方命圮族。嶽曰：「試可乃已。」',
+              paddle_confidence: 0.87,
+              qwen_confidence: 0.91,
+            },
+            evaluation: {
+              decision: 'needs_review',
+              problem_class: this.selectedReviewItem ? this.selectedReviewItem.problem_class : 'RARE_GLYPH',
+              problem_class_confidence: 0.84,
+              reasoning: '文本中出現罕見字形「巽」，光學識別引擎存在較大分歧。Paddle OCR與Qwen-VL在「巽/遜」字識別上不一致，需人工核對原始文獻。',
+              inter_engine_cer: this.selectedReviewItem ? this.selectedReviewItem.inter_engine_cer : 0.23,
+              cjk_validity_ratio: this.selectedReviewItem ? this.selectedReviewItem.cjk_validity_ratio : 0.78,
+            },
+            chunks: [
+              {
+                chunk_id: 'chk_001', index: 0,
+                text: '帝曰：「汝能庸命巽朕位？」',
+                text_canonical: '帝曰：「汝能庸命遜朕位？」',
+                text_vernacular: '堯帝說：「你能謙遜地承接我的帝位嗎？」',
+                translation_status: 'ok',
+              },
+              {
+                chunk_id: 'chk_002', index: 1,
+                text: '鯀哉！鯀哉！方命圮族。',
+                text_canonical: null,
+                text_vernacular: null,
+                translation_status: 'pending',
+              },
+            ],
+          };
+        },
+
+        getOcrCer(engineKey) {
+          if (!this.pageDetail || !this.pageDetail.ocr || !this.pageDetail.evaluation) return null;
+          const cer = this.pageDetail.evaluation.inter_engine_cer;
+          if (cer > 0.1) return (cer * 100).toFixed(0) + '%';
+          return null;
+        },
+
+        openCorrectionModal(chunk) {
+          if (chunk) {
+            this.correction.chunk_id = chunk.chunk_id;
+            this.correction.corrected_text = chunk.text || '';
+            this.correction.problem_class = this.selectedReviewItem ? (this.selectedReviewItem.problem_class || '') : '';
+          } else {
+            this.correction.chunk_id = '';
+            this.correction.corrected_text = '';
+            this.correction.problem_class = '';
+          }
+          this.correction.notes = '';
+          this.showCorrectionModal = true;
+        },
+
+        async approvePage(pageId) {
+          if (!pageId) return;
+          try {
+            const res = await this._authFetch('/api/hitl/approve', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ page_id: pageId }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            this.showToast(this.t('toast.pageApproved'), 'success');
+            this.reviewQueue = this.reviewQueue.filter(i => i.page_id !== pageId);
+            this.selectedReviewItem = null;
+            this.pageDetail = null;
+          } catch (e) {
+            // Demo: still show success
+            this.showToast(this.t('toast.pageApprovedDemo'), 'success');
+            this.reviewQueue = this.reviewQueue.filter(i => i.page_id !== pageId);
+            this.selectedReviewItem = null;
+            this.pageDetail = null;
+          }
+        },
+
+        async submitCorrection() {
+          if (!this.correction.corrected_text.trim()) {
+            this.showToast(this.t('toast.enterCorrection'), 'error');
+            return;
+          }
+          const pageId = this.pageDetail && this.pageDetail.page && this.pageDetail.page.page_id;
+          try {
+            const res = await this._authFetch('/api/hitl/correct', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                page_id: pageId,
+                chunk_id: this.correction.chunk_id || null,
+                corrected_text: this.correction.corrected_text,
+                problem_class: this.correction.problem_class,
+                notes: this.correction.notes,
+              }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          } catch (e) {
+            // ignore in demo
+          }
+          this.showToast(this.t('toast.correctionDone'), 'success');
+          this.showCorrectionModal = false;
+        },
+
+        async flagIssue() {
+          if (!this.selectedReviewItem) return;
+          try {
+            await this._authFetch('/api/hitl/flag', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ page_id: this.selectedReviewItem.page_id }),
+            });
+          } catch (e) { /* non-fatal */ }
+          this.showToast(this.t('toast.flagged'), 'info');
+        },
+
+        goNextReview() {
+          if (!this.selectedReviewItem || this.reviewQueue.length === 0) return;
+          const idx = this.reviewQueue.findIndex(i => i.page_id === this.selectedReviewItem.page_id);
+          const next = this.reviewQueue[(idx + 1) % this.reviewQueue.length];
+          if (next) this.selectReviewItem(next);
+        },
+
+        // ---- DASHBOARD / STATS ----
+        async loadStats() {
+          this.statsLoading = true;
+          try {
+            const res = await fetch('/api/admin/stats');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            this.stats = await res.json();
+          } catch (e) {
+            // Demo data
+            this.stats = {
+              documents: { total: 247, primary: 183, secondary: 64 },
+              pages: { total: 41892, ocr: 38104, native: 3788, by_fusion_status: { ok: 39201, failed: 1234, pending: 1457 } },
+              chunks: { total: 312084, primary: 241056, secondary: 71028, translated: 272, untranslated: 311812, embedded: 1840 },
+              keywords: { total: 18274 },
+              communities: { total: 89 },
+              translation_progress: { ok: 272, failed: 12, total: 312084, pct: 0.087 },
+              embedding_progress: { ok: 1840, total: 312084, pct: 0.59 },
+            };
+          } finally {
+            this.statsLoading = false;
+            await this.$nextTick();
+            this.drawCharts();
+          }
+        },
+
+        drawCharts() {
+          if (!this.stats) return;
+
+          // Destroy existing charts
+          if (this.charts.tier) { this.charts.tier.destroy(); }
+          if (this.charts.ocr) { this.charts.ocr.destroy(); }
+
+          const tierCanvas = document.getElementById('tierChart');
+          const ocrCanvas = document.getElementById('ocrStatusChart');
+          if (!tierCanvas || !ocrCanvas) return;
+
+          // Donut: tier distribution
+          const primary = this.stats.chunks?.primary || 0;
+          const secondary = this.stats.chunks?.secondary || 0;
+          this.charts.tier = new Chart(tierCanvas, {
+            type: 'doughnut',
+            data: {
+              labels: [this.t('chart.primary'), this.t('chart.secondary')],
+              datasets: [{
+                data: [primary, secondary],
+                backgroundColor: ['#10b981', '#818cf8'],
+                borderColor: ['#ffffff', '#ffffff'],
+                borderWidth: 3,
+              }],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: true,
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: { font: { size: 11, family: "'Noto Serif SC', serif" }, padding: 12 },
+                },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => ` ${ctx.label}: ${ctx.parsed.toLocaleString()}`,
+                  },
+                },
+              },
+              cutout: '65%',
+            },
+          });
+
+          // Bar: OCR status
+          const fus = this.stats.pages?.by_fusion_status || {};
+          this.charts.ocr = new Chart(ocrCanvas, {
+            type: 'bar',
+            data: {
+              labels: [this.t('chart.passed'), this.t('chart.pendingReview'), this.t('chart.failed')],
+              datasets: [{
+                label: this.t('chart.pageCount'),
+                data: [fus.ok || 0, fus.pending || 0, fus.failed || 0],
+                backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                borderRadius: 6,
+                borderSkipped: false,
+              }],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => ` ${ctx.parsed.y.toLocaleString()} ${this.t('upload.pages')}`,
+                  },
+                },
+              },
+              scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+                y: {
+                  grid: { color: '#f1f5f9' },
+                  ticks: { font: { size: 10 }, callback: (v) => v >= 1000 ? (v/1000).toFixed(0) + 'k' : v },
+                },
+              },
+            },
+          });
+        },
+
+        // ---- PIPELINE ----
+        async loadPipeline() {
+          this.pipelineLoading = true;
+          try {
+            const res = await fetch('/api/admin/pipeline');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            this.pipelineJobs = data.jobs || [];
+          } catch (e) {
+            // Demo
+            this.pipelineJobs = [
+              { name: 'translation', status: 'running', ok: 272, total: 312084, pct: 0.087, elapsed_s: 7234, eta_s: 83013600 },
+              { name: 'embedding', status: 'running', ok: 1840, total: 312084, pct: 0.59, elapsed_s: 3600, eta_s: 608400 },
+              { name: 'keyword_extraction', status: 'complete', ok: 18274, total: 18274, pct: 100, elapsed_s: 14400, eta_s: 0 },
+              { name: 'community_detection', status: 'pending', ok: 0, total: 89, pct: 0, elapsed_s: 0, eta_s: null },
+              { name: 'citation_linking', status: 'pending', ok: 0, total: 0, pct: 0, elapsed_s: 0, eta_s: null },
+            ];
+          } finally {
+            this.pipelineLoading = false;
+          }
+          this.checkSystemHealth();
+        },
+
+        async checkSystemHealth() {
+          // Public /health endpoint — no auth required
+          try {
+            const res = await fetch('/health');
+            const serverOk = res.ok;
+            // For detailed per-service status, try the admin health endpoint
+            let neo4j = serverOk ? 'ok' : 'error';
+            let minio = serverOk ? 'ok' : 'error';
+            let silra = serverOk ? 'ok' : 'error';
+            try {
+              const hr = await this._authFetch('/api/admin/health');
+              if (hr.ok) {
+                const hd = await hr.json();
+                neo4j  = hd.neo4j  === 'ok' ? 'ok' : 'error';
+                minio  = hd.minio  === 'ok' ? 'ok' : 'error';
+                silra  = hd.silra === 'configured' ? 'ok' : 'error';
+              }
+            } catch (e) { /* detailed check unavailable */ }
+            this.systemHealth = [
+              { name: 'Neo4j',    status: neo4j },
+              { name: 'MinIO',    status: minio },
+              { name: 'Silra API', status: silra },
+            ];
+          } catch (e) {
+            this.systemHealth = [
+              { name: 'Neo4j',    status: 'error' },
+              { name: 'MinIO',    status: 'error' },
+              { name: 'Silra API', status: 'error' },
+            ];
+          }
+        },
+
+        // ---- HELPERS ----
+        formatTime(seconds) {
+          if (!seconds || seconds <= 0) return '—';
+          const h = Math.floor(seconds / 3600);
+          const m = Math.floor((seconds % 3600) / 60);
+          const s = Math.floor(seconds % 60);
+          if (h > 0) return `${h}h ${m}m`;
+          if (m > 0) return `${m}m ${s}s`;
+          return `${s}s`;
+        },
+
+        problemClassColor(cls) {
+          const map = {
+            RARE_GLYPH: 'bg-red-900 text-red-300',
+            DEGRADATION: 'bg-orange-900 text-orange-300',
+            LAYOUT_AMBIGUITY: 'bg-yellow-900 text-yellow-300',
+            READING_ORDER: 'bg-blue-900 text-blue-300',
+            KANBUN_KUNTEN: 'bg-purple-900 text-purple-300',
+          };
+          return map[cls] || 'bg-slate-700 text-slate-300';
+        },
+
+        scoreBadgeClass(score) {
+          if (score >= 0.85) return 'bg-emerald-100 text-emerald-700';
+          if (score >= 0.65) return 'bg-amber-100 text-amber-700';
+          return 'bg-red-100 text-red-600';
+        },
+
+        scoreBarColor(score) {
+          if (score >= 0.85) return '#10b981';
+          if (score >= 0.65) return '#f59e0b';
+          return '#f87171';
+        },
+
+        langLabel(lang) {
+          const map = {
+            'zh-classical': 'lang.classical',
+            'zh-modern': 'lang.modern',
+            'ja-kanbun': 'lang.kanbun',
+            'ja-modern': 'lang.japanese',
+          };
+          return map[lang] ? this.t(map[lang]) : (lang || '');
+        },
+
+        intentLabel(intent) {
+          const map = {
+            lookup: 'intent.lookup',
+            synthesis: 'intent.synthesis',
+            comparison: 'intent.comparison',
+            context: 'intent.context',
+            factual: 'intent.factual',
+          };
+          return intent ? (map[intent] ? this.t(map[intent]) : intent) : '';
+        },
+
+        evidenceLabel(ev) {
+          const map = {
+            strong: 'evidence.strong',
+            moderate: 'evidence.moderate',
+            weak: 'evidence.weak',
+          };
+          return ev ? (map[ev] ? this.t(map[ev]) : ev) : '';
+        },
+
+        jobDisplayName(name) {
+          const map = {
+            translation: 'job.translation',
+            embedding: 'job.embedding',
+            keyword_extraction: 'job.keywordExtraction',
+            community_detection: 'job.communityDetection',
+            citation_linking: 'job.citationLinking',
+          };
+          return map[name] ? this.t(map[name]) : name;
+        },
+
+        jobStatusClass(status) {
+          const map = {
+            running: 'bg-teal-100 text-teal-700',
+            complete: 'bg-emerald-100 text-emerald-700',
+            pending: 'bg-slate-100 text-slate-500',
+            failed: 'bg-red-100 text-red-600',
+          };
+          return map[status] || 'bg-slate-100 text-slate-500';
+        },
+
+        jobStatusLabel(status) {
+          const map = {
+            running: 'job.running',
+            complete: 'job.complete',
+            pending: 'job.pending',
+            failed: 'job.failed',
+          };
+          return map[status] ? this.t(map[status]) : status;
+        },
+
+        showToast(message, type = 'info') {
+          const id = ++this._toastCounter;
+          this.toasts.push({ id, message, type });
+          setTimeout(() => {
+            this.toasts = this.toasts.filter(t => t.id !== id);
+          }, 3500);
+        },
+      };
+    }
+  </script>
+
+
+</body>
+</html>

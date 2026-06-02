@@ -105,6 +105,8 @@ def detect_reader(path: str | Path) -> str:
 
     Returns one of ``epub``, ``pdf``, ``packed_md`` or raises ``ValueError``.
     """
+    from apps.backend.readers.image_reader import IMAGE_SUFFIXES, TEXT_SUFFIXES
+
     p = Path(path)
     if p.is_dir() and p.name.endswith(".packed"):
         return "packed_md"
@@ -113,9 +115,16 @@ def detect_reader(path: str | Path) -> str:
         return "epub"
     if suffix == ".pdf":
         return "pdf"
+    if suffix in IMAGE_SUFFIXES:
+        return "image"
+    if suffix in TEXT_SUFFIXES:
+        return "text"
     if p.is_dir():
         if any(child.suffix == ".md" for child in p.iterdir()):
             return "packed_md"
+        # A directory of images (uploaded multi-page scan).
+        if any(child.suffix.lower() in IMAGE_SUFFIXES for child in p.iterdir()):
+            return "image"
     raise ValueError(f"no reader for {path}: unknown format")
 
 
@@ -142,5 +151,13 @@ def iter_pages(path: str | Path, **kwargs: Any) -> Iterator[PageRecord]:
         from apps.backend.readers import packed_md
 
         yield from packed_md.iter_pages(path, **kwargs)
+    elif backend == "image":
+        from apps.backend.readers import image_reader
+
+        yield from image_reader.iter_image_pages(path, **kwargs)
+    elif backend == "text":
+        from apps.backend.readers import image_reader
+
+        yield from image_reader.iter_text_pages(path, **kwargs)
     else:  # pragma: no cover — guarded by detect_reader
         raise ValueError(f"unsupported reader backend: {backend}")

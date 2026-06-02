@@ -47,15 +47,24 @@ def _setup_logging(log_file: str) -> None:
 
 
 def _connect():
+    # max_connection_pool_size prevents simultaneous auth handshakes from
+    # triggering Neo4j's AuthenticationRateLimit when workers > 1.
     return GraphDatabase.driver(
         os.getenv("NEO4J_URI", "bolt://localhost:7687"),
         auth=(os.getenv("NEO4J_USERNAME", "neo4j"), os.getenv("NEO4J_PASSWORD", "AncientChina")),
+        max_connection_pool_size=10,
+        connection_acquisition_timeout=60,
     )
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Full-corpus translation runner (A1)")
     ap.add_argument("--batch-size", type=int, default=50, help="Chunks per translate_chunks call")
+    ap.add_argument("--workers", type=int, default=1,
+                    help="Parallel worker threads per batch (default 1=serial). "
+                         "Start with 8; tune up to Silra's concurrency ceiling. "
+                         "Each worker opens its own Neo4j session; rate-limit "
+                         "429 responses are honoured via Retry-After backoff.")
     ap.add_argument("--max-chunks", type=int, default=None, help="Stop after N total chunks")
     ap.add_argument("--tier", choices=["primary", "secondary"], default=None, help="Limit to one tier")
     ap.add_argument("--recompute", action="store_true", help="Re-translate already-done chunks")
@@ -66,8 +75,8 @@ def main() -> None:
     log = logging.getLogger("run_translation")
 
     driver = _connect()
-    log.info("Translation runner started — tier=%s batch=%d max=%s recompute=%s",
-             args.tier, args.batch_size, args.max_chunks, args.recompute)
+    log.info("Translation runner started — tier=%s batch=%d workers=%d max=%s recompute=%s",
+             args.tier, args.batch_size, args.workers, args.max_chunks, args.recompute)
 
     t0 = time.time()
     total_ok = 0
@@ -91,6 +100,7 @@ def main() -> None:
             limit=args.batch_size,
             tier_filter=args.tier,
             recompute=args.recompute,
+            workers=args.workers,
         )
 
         if report.total == 0:

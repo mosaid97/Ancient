@@ -75,7 +75,9 @@ def get_silra_client(timeout: float = 60.0) -> OpenAI:
 def _retry(func, *args, max_retries: int = 3, base_delay: float = 1.0, **kwargs):
     """Retry ``func`` with exponential backoff on transient Silra errors.
 
-    Per AGENTS.md §5: max 3 retries, exponential backoff.
+    Per AGENTS.md §5: max 3 retries, exponential backoff. Honours the
+    ``Retry-After`` response header on :class:`openai.RateLimitError` (HTTP 429)
+    so parallel workers don't hammer the API after a rate-limit response.
     """
     last_exc: BaseException | None = None
     for attempt in range(max_retries):
@@ -86,6 +88,17 @@ def _retry(func, *args, max_retries: int = 3, base_delay: float = 1.0, **kwargs)
             if attempt == max_retries - 1:
                 break
             delay = base_delay * (2**attempt)
+            # Honour Retry-After header when the server tells us exactly how long
+            # to wait (common on 429 responses from Silra under parallel load).
+            if isinstance(exc, openai.RateLimitError):
+                response = getattr(exc, "response", None)
+                if response is not None:
+                    ra = getattr(response, "headers", {}).get("retry-after")
+                    if ra:
+                        try:
+                            delay = max(delay, float(ra))
+                        except ValueError:
+                            pass
             logger.warning(
                 "Silra transient error (attempt %d/%d): %s — retrying in %.1fs",
                 attempt + 1,

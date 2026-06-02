@@ -20,7 +20,15 @@
       "Bash(ls:*)",
       "Bash(wc:*)",
       "Bash(head:*)",
-      "Bash(tail:*)"
+      "Bash(tail:*)",
+      "Bash(ps:*)",
+      "Bash(kill:*)",
+      "Bash(mkdir:*)",
+      "Bash(sleep:*)",
+      "Bash(grep:*)",
+      "Bash(bash:*)",
+      "Bash(sh:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [
       "Bash(git push:*)",
@@ -44,5 +52,10 @@
         ]
       }
     ]
-  }
+  },
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true,
+    "context7-plugin@context7-marketplace": true
+  },
+  "enabledMcpjsonServers": ["context7"]
 }

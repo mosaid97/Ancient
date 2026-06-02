@@ -17,22 +17,53 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 _RERANKER_MODEL = "BAAI/bge-reranker-v2-gemma"
+_FALLBACK_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 _DEFAULT_TOP_K = 20
 _DEFAULT_THRESHOLD = 0.0
 
 _reranker_instance: Any = None
+_reranker_type: str = "none"
+
+
+class _SentenceTransformerReranker:
+    """Bi-encoder cosine reranker using a cached SentenceTransformer model."""
+
+    def __init__(self, model_name: str):
+        from sentence_transformers import SentenceTransformer  # type: ignore[import]
+        self._model = SentenceTransformer(model_name)
+
+    def compute_score(self, pairs: list[tuple[str, str]], normalize: bool = True) -> list[float]:
+        queries = [q for q, _ in pairs]
+        docs = [d for _, d in pairs]
+        import numpy as np
+        q_emb = self._model.encode(queries, normalize_embeddings=True)
+        d_emb = self._model.encode(docs, normalize_embeddings=True)
+        scores = (q_emb * d_emb).sum(axis=1).tolist()
+        if normalize:
+            mn, mx = min(scores), max(scores)
+            rng = mx - mn or 1.0
+            scores = [(s - mn) / rng for s in scores]
+        return scores
 
 
 def _get_reranker():
-    global _reranker_instance
+    global _reranker_instance, _reranker_type
     if _reranker_instance is None:
+        # Try primary BGE model first
         try:
             from FlagEmbedding import FlagReranker  # type: ignore[import]
             _reranker_instance = FlagReranker(_RERANKER_MODEL, use_fp16=True)
+            _reranker_type = "bge"
             log.info("Loaded reranker: %s", _RERANKER_MODEL)
         except Exception as exc:
-            log.error("Failed to load reranker %s: %s", _RERANKER_MODEL, exc)
-            raise
+            log.warning("BGE reranker unavailable (%s), falling back to %s", exc, _FALLBACK_MODEL)
+            try:
+                _reranker_instance = _SentenceTransformerReranker(_FALLBACK_MODEL)
+                _reranker_type = "minilm"
+                log.info("Loaded fallback reranker: %s", _FALLBACK_MODEL)
+            except Exception as exc2:
+                log.error("All rerankers failed: %s", exc2)
+                raise
     return _reranker_instance
 
 

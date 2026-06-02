@@ -47,6 +47,9 @@ CONSTRAINTS: list[tuple[str, str, str]] = [
     ("verifier_failure_id_unique", "VERIFIER_FAILURE", "id"),
     ("metrics_snapshot_ts_unique", "METRICS_SNAPSHOT", "ts"),
     ("community_id_unique", "COMMUNITY", "id"),
+    # Track E (website upload + HITL) — see AGENTS.md §11.
+    ("upload_job_id_unique", "UPLOAD_JOB", "id"),
+    ("comment_id_unique", "COMMENT", "id"),
 ]
 
 
@@ -129,6 +132,17 @@ LOOKUP_INDEXES: list[tuple[str, str, str]] = [
     ("dictionary_entry_term_index", "DICTIONARY_ENTRY", "term"),
     ("norm_tradition_index", "NORM", "tradition"),
     ("norm_scope_index", "NORM", "scope"),
+    # Track E (website upload + HITL fusion + interactive view) — see AGENTS.md §11.
+    # DOCUMENT lifecycle: awaiting_review -> approved -> indexed (None = legacy bulk corpus).
+    ("document_status_index", "DOCUMENT", "status"),
+    # Custom user-supplied OCR engine (OpenAI-compatible vision); mirrors the
+    # built-in paddle/qwen/deepseek status indexes.
+    ("page_custom_ocr_status_index", "PAGE", "customOcrStatus"),
+    # Upload-job state machine polled by the web UI.
+    ("upload_job_status_index", "UPLOAD_JOB", "status"),
+    ("upload_job_document_index", "UPLOAD_JOB", "documentId"),
+    # Interactive-view per-page user comments.
+    ("comment_page_index", "COMMENT", "pageId"),
 ]
 
 

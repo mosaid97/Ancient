@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -317,6 +318,7 @@ def translate_chunks(
     recompute: bool = False,
     client: OpenAI | None = None,
     model: str | None = None,
+    workers: int = 1,
 ) -> TranslationReport:
     """Translate a batch of CHUNK nodes.
 
@@ -327,6 +329,10 @@ def translate_chunks(
         recompute: If True, re-process already-translated chunks.
         client: Optional Silra client.
         model: Override chat model.
+        workers: Number of parallel worker threads (default 1 = serial).
+            The Neo4j driver and OpenAI client are both thread-safe; each
+            ``_process_*`` call opens its own driver session, so workers > 1
+            is safe. Tune to Silra's concurrency ceiling; start with 8–16.
 
     Returns:
         :class:`TranslationReport` with aggregate counts.
@@ -345,15 +351,49 @@ def translate_chunks(
         ).data()
 
     report.total = len(rows)
-    log.info("translate_chunks: %d chunks to process (tier=%s)", report.total, tier_filter)
+    log.info(
+        "translate_chunks: %d chunks to process (tier=%s workers=%d)",
+        report.total, tier_filter, workers,
+    )
 
-    for row in rows:
+    def _dispatch(row: dict[str, Any]) -> TranslatePageResult:
         tier = (row.get("tier") or "secondary").lower()
         if tier == "primary":
-            result = _process_primary(row, driver, c, m)
-        else:
-            result = _process_secondary(row, driver, c, m)
+            return _process_primary(row, driver, c, m)
+        return _process_secondary(row, driver, c, m)
 
+    if workers <= 1:
+        results: list[TranslatePageResult] = [_dispatch(row) for row in rows]
+    else:
+        results = []
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            future_to_row = {pool.submit(_dispatch, row): row for row in rows}
+            for future in as_completed(future_to_row):
+                row = future_to_row[future]
+                try:
+                    results.append(future.result())
+                except Exception as exc:
+                    # Unhandled exception outside _process_* (should be rare)
+                    chunk_id = row.get("chunk_id", "?")
+                    log.error("Worker unhandled exception chunk=%s: %s", chunk_id, exc)
+                    ts = datetime.now(timezone.utc).isoformat()
+                    with driver.session() as s:
+                        s.run(
+                            _WRITE_FAILED,
+                            chunk_id=chunk_id,
+                            error=str(exc)[:500],
+                            ts=ts,
+                        ).consume()
+                    results.append(TranslatePageResult(
+                        chunk_id=chunk_id,
+                        page_id=row.get("page_id", ""),
+                        tier=row.get("tier", "?"),
+                        language=row.get("language", "?"),
+                        status="failed",
+                        error=str(exc),
+                    ))
+
+    for result in results:
         report.results.append(result)
         if result.status == "ok":
             report.ok += 1

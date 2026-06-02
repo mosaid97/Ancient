@@ -26,8 +26,9 @@ from apps.backend.pipeline.community_summarize import build_community_summaries
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="B3: Leiden community summaries")
-    p.add_argument("--resolution", type=float, default=1.0, help="Leiden resolution")
+    p.add_argument("--resolution", type=float, default=3.0, help="Leiden resolution (higher=more communities)")
     p.add_argument("--min-size", type=int, default=5, help="Min community size (chunks)")
+    p.add_argument("--max-kw-freq", type=int, default=500, help="Exclude keywords appearing in more than N chunks")
     p.add_argument("--limit", type=int, default=500_000, help="Max edges to load (smoke: 10000)")
     p.add_argument("--max-summary-chunks", type=int, default=10)
     p.add_argument("--log-file", default="logs/community_summarize.log")
@@ -52,17 +53,18 @@ def main() -> None:
 
     driver = GraphDatabase.driver(
         os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-        auth=(os.getenv("NEO4J_USER", "neo4j"), os.getenv("NEO4J_PASSWORD", "")),
+        auth=(os.getenv("NEO4J_USERNAME", "neo4j"), os.getenv("NEO4J_PASSWORD", "")),
     )
 
-    log.info("Starting B3 community pipeline (resolution=%.2f, min_size=%d, limit=%d)",
-             args.resolution, args.min_size, args.limit)
+    log.info("Starting B3 community pipeline (resolution=%.2f, min_size=%d, max_kw_freq=%d, limit=%d)",
+             args.resolution, args.min_size, args.max_kw_freq, args.limit)
     t0 = time.time()
 
     report = build_community_summaries(
         driver,
         resolution=args.resolution,
         min_size=args.min_size,
+        max_kw_freq=args.max_kw_freq,
         limit=args.limit,
         max_summary_chunks=args.max_summary_chunks,
     )

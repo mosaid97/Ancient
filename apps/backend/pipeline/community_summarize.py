@@ -14,7 +14,8 @@ Pipeline:
   4. Add community_summary_embedding_index (already in schema.py).
 
 ADR (AGENTS.md §11):
-  - Leiden resolution = 1.0, min_community_size = 5 chunks
+  - Leiden resolution = 3.0 (raised from 1.0 after 8-community diagnosis; see B3 fix notes)
+  - min_community_size = 5 chunks; max_kw_freq = 500 (exclude stop-like keywords)
   - Summary model: deepseek-chat, ~200 tokens
   - Expected community count: tens–hundreds (sane range for this corpus)
 """
@@ -35,8 +36,9 @@ log = logging.getLogger(__name__)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-_LEIDEN_RESOLUTION = 1.0
+_LEIDEN_RESOLUTION = 3.0
 _MIN_COMMUNITY_SIZE = 5
+_MAX_KW_FREQ = 500  # keywords appearing in more chunks than this are too generic to drive communities
 _MAX_SUMMARY_CHUNKS = 10    # representative chunks fed to LLM per community
 _SUMMARY_MAX_TOKENS = 300
 _EMBED_BATCH = 10
@@ -56,7 +58,10 @@ _SUMMARY_PROMPT = """\
 _BIPARTITE_QUERY = """
 MATCH (c:CHUNK)-[:MENTION]->(k:KEYWORD)
 WHERE c.embedding IS NOT NULL
-RETURN c.id AS chunk_id, k.name AS keyword_name
+WITH k, collect(c.id) AS cids
+WHERE size(cids) >= 2 AND size(cids) <= $max_kw_freq
+UNWIND cids AS chunk_id
+RETURN chunk_id, k.name AS keyword_name
 LIMIT $limit
 """
 
@@ -186,8 +191,14 @@ def load_bipartite_graph(
     driver: Driver,
     *,
     limit: int = 500_000,
+    max_kw_freq: int = _MAX_KW_FREQ,
 ) -> tuple[list[str], list[tuple[int, int]]]:
     """Load CHUNK–KEYWORD edges into an edge list for igraph.
+
+    Keywords appearing in fewer than 2 or more than max_kw_freq chunks are
+    excluded — very rare keywords add noise while very common ones (generic
+    historical terms) collapse the CHUNK projection into a near-complete graph
+    that defeats Leiden community detection.
 
     Returns:
         chunk_ids: ordered list of unique CHUNK IDs (vertex labels)
@@ -195,7 +206,7 @@ def load_bipartite_graph(
             returns only the chunk indices for the CHUNK projection.
     """
     with driver.session() as s:
-        rows = s.run(_BIPARTITE_QUERY, limit=limit).data()
+        rows = s.run(_BIPARTITE_QUERY, limit=limit, max_kw_freq=max_kw_freq).data()
 
     chunk_set: dict[str, int] = {}
     keyword_set: dict[str, int] = {}
@@ -280,6 +291,7 @@ def build_community_summaries(
     resolution: float = _LEIDEN_RESOLUTION,
     min_size: int = _MIN_COMMUNITY_SIZE,
     max_summary_chunks: int = _MAX_SUMMARY_CHUNKS,
+    max_kw_freq: int = _MAX_KW_FREQ,
     limit: int = 500_000,
     llm_model: str | None = None,
     embed_model: str | None = None,
@@ -288,9 +300,11 @@ def build_community_summaries(
 
     Args:
         driver: Open Neo4j driver.
-        resolution: Leiden resolution parameter (default 1.0).
+        resolution: Leiden resolution parameter (default 3.0).
         min_size: Minimum community size to keep (default 5 chunks).
         max_summary_chunks: Max representative chunks fed to the LLM.
+        max_kw_freq: Exclude keywords appearing in more than this many chunks
+            (too generic to drive community structure; default 500).
         limit: Max CHUNK-KEYWORD edges to load (for smoke tests reduce to ~10_000).
         llm_model: Model for summary generation (default: deepseek-chat).
         embed_model: Model for summary embedding (default: text-embedding-v4).
@@ -302,8 +316,8 @@ def build_community_summaries(
     t_start = time.time()
 
     # 1. Load graph
-    log.info("Loading CHUNK-KEYWORD bipartite graph (limit=%d)…", limit)
-    chunk_ids, edge_list, n_chunks, n_keywords = load_bipartite_graph(driver, limit=limit)
+    log.info("Loading CHUNK-KEYWORD bipartite graph (limit=%d, max_kw_freq=%d)…", limit, max_kw_freq)
+    chunk_ids, edge_list, n_chunks, n_keywords = load_bipartite_graph(driver, limit=limit, max_kw_freq=max_kw_freq)
     report.chunks_loaded = n_chunks
     report.edges_loaded = len(edge_list)
     log.info("Loaded %d chunks, %d keywords, %d edges", n_chunks, n_keywords, len(edge_list))
