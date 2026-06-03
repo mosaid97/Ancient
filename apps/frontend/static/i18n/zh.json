@@ -213,5 +213,18 @@
   "toast.jobDeleted": "上傳任務已刪除",
   "toast.jobDeleteFailed": "刪除失敗：",
   "toast.loggedIn": "已登入",
-  "toast.loggedOut": "已登出"
+  "toast.loggedOut": "已登出",
+  "interactive.tabAsk": "查詢",
+  "interactive.tabNotes": "筆記",
+  "interactive.tabHistory": "歷史",
+  "interactive.imageVariant": "圖像",
+  "interactive.preprocessed": "處理後",
+  "interactive.original": "原圖",
+  "interactive.selectedRegion": "已選區域",
+  "interactive.regionSelected": "區域已選",
+  "interactive.clickHint": "點擊區域選取，懸停查看OCR文本",
+  "interactive.noHistory": "暫無互動記錄",
+  "interactive.regionNotes": "區域備注",
+  "interactive.pageNotes": "頁面備注",
+  "interactive.noteForRegion": "備注區域"
 }

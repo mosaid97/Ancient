@@ -213,5 +213,18 @@
   "toast.jobDeleted": "アップロードジョブを削除しました",
   "toast.jobDeleteFailed": "削除に失敗しました：",
   "toast.loggedIn": "ログインしました",
-  "toast.loggedOut": "ログアウトしました"
+  "toast.loggedOut": "ログアウトしました",
+  "interactive.tabAsk": "質問",
+  "interactive.tabNotes": "メモ",
+  "interactive.tabHistory": "履歴",
+  "interactive.imageVariant": "画像",
+  "interactive.preprocessed": "処理済",
+  "interactive.original": "原画像",
+  "interactive.selectedRegion": "選択領域",
+  "interactive.regionSelected": "領域選択済",
+  "interactive.clickHint": "領域をクリックして選択、ホバーでOCRテキストをプレビュー",
+  "interactive.noHistory": "インタラクション履歴なし",
+  "interactive.regionNotes": "領域メモ",
+  "interactive.pageNotes": "ページメモ",
+  "interactive.noteForRegion": "領域へのメモ"
 }

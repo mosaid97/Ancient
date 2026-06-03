@@ -213,5 +213,18 @@
   "toast.jobDeleted": "Upload job deleted",
   "toast.jobDeleteFailed": "Delete failed: ",
   "toast.loggedIn": "Signed in",
-  "toast.loggedOut": "Signed out"
+  "toast.loggedOut": "Signed out",
+  "interactive.tabAsk": "Ask",
+  "interactive.tabNotes": "Notes",
+  "interactive.tabHistory": "History",
+  "interactive.imageVariant": "Image",
+  "interactive.preprocessed": "Processed",
+  "interactive.original": "Original",
+  "interactive.selectedRegion": "Selected Region",
+  "interactive.regionSelected": "Region selected",
+  "interactive.clickHint": "Click a region to select it; hover to preview OCR text",
+  "interactive.noHistory": "No interaction history yet",
+  "interactive.regionNotes": "Region notes",
+  "interactive.pageNotes": "Page notes",
+  "interactive.noteForRegion": "Note for region"
 }

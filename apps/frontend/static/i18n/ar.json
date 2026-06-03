@@ -213,5 +213,18 @@
   "toast.jobDeleted": "تم حذف مهمة الرفع",
   "toast.jobDeleteFailed": "فشل الحذف: ",
   "toast.loggedIn": "تم تسجيل الدخول",
-  "toast.loggedOut": "تم تسجيل الخروج"
+  "toast.loggedOut": "تم تسجيل الخروج",
+  "interactive.tabAsk": "استعلام",
+  "interactive.tabNotes": "ملاحظات",
+  "interactive.tabHistory": "السجل",
+  "interactive.imageVariant": "الصورة",
+  "interactive.preprocessed": "معالجة",
+  "interactive.original": "أصلية",
+  "interactive.selectedRegion": "المنطقة المحددة",
+  "interactive.regionSelected": "تم تحديد المنطقة",
+  "interactive.clickHint": "انقر على منطقة لتحديدها؛ مرّر المؤشر لمعاينة نص OCR",
+  "interactive.noHistory": "لا يوجد سجل تفاعل",
+  "interactive.regionNotes": "ملاحظات المنطقة",
+  "interactive.pageNotes": "ملاحظات الصفحة",
+  "interactive.noteForRegion": "ملاحظة للمنطقة"
 }
