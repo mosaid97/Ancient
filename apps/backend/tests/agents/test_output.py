@@ -50,8 +50,65 @@ class TestRibbonResult:
         r = self._make()
         d = r.to_dict()
         for key in ("chunkId", "text", "tier", "pageId", "documentId", "chunkIndex",
-                    "retrievalScore", "rerankScore", "verified", "evidenceStrength", "verifierOutcome"):
-            assert key in d
+                    "retrievalScore", "rerankScore", "verified", "evidenceStrength", "verifierOutcome",
+                    "citation", "documentTitle", "documentAuthor", "documentEdition",
+                    "documentPublicationPeriod", "chapterTitle", "chapterOrdinal",
+                    "sectionTitle", "pageIndex", "pageMode", "topic"):
+            assert key in d, f"missing key: {key}"
+
+    def test_citation_full_spine(self):
+        r = self._make(
+            document_title="唐律疏議",
+            chapter_title="名例律",
+            chapter_ordinal=1,
+            section_title="十惡",
+            page_index=2,
+        )
+        assert r.citation == "《唐律疏議·卷1·十惡·p.3》"
+
+    def test_citation_title_only(self):
+        r = self._make(document_title="史記")
+        assert r.citation == "《史記》"
+
+    def test_citation_unknown_when_no_title(self):
+        r = self._make()
+        assert r.citation == "(unknown)"
+
+    def test_citation_chapter_no_ordinal(self):
+        r = self._make(document_title="漢書", chapter_title="本紀")
+        assert r.citation == "《漢書·本紀》"
+
+    def test_provenance_fields_in_to_dict(self):
+        r = self._make(
+            document_title="唐律疏議",
+            document_author="長孫無忌",
+            document_edition="四庫全書本",
+            document_publication_period="唐高宗",
+            chapter_title="名例律",
+            chapter_ordinal=1,
+            section_title="十惡",
+            page_index=0,
+            page_mode="text",
+            topic="刑律",
+        )
+        d = r.to_dict()
+        assert d["documentTitle"] == "唐律疏議"
+        assert d["documentAuthor"] == "長孫無忌"
+        assert d["documentEdition"] == "四庫全書本"
+        assert d["documentPublicationPeriod"] == "唐高宗"
+        assert d["chapterTitle"] == "名例律"
+        assert d["chapterOrdinal"] == 1
+        assert d["sectionTitle"] == "十惡"
+        assert d["pageIndex"] == 0
+        assert d["pageMode"] == "text"
+        assert d["topic"] == "刑律"
+
+    def test_provenance_fields_none_by_default(self):
+        r = self._make()
+        d = r.to_dict()
+        assert d["documentTitle"] is None
+        assert d["chapterTitle"] is None
+        assert d["topic"] is None
 
     def test_to_dict_scores_rounded(self):
         r = self._make(retrieval_score=0.123456789, rerank_score=0.987654321)

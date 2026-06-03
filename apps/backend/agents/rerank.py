@@ -11,6 +11,7 @@ rerank(query, candidates, *, top_k, threshold) -> list[RerankResult]
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -114,10 +115,16 @@ def rerank(
     pairs = [(query, text) for _, text, _ in candidates]
 
     try:
-        raw_scores = reranker.compute_score(pairs, normalize=True)
-        if isinstance(raw_scores, float):
-            raw_scores = [raw_scores]
-        scores = [float(s) for s in raw_scores]
+        # Mini-batch to avoid MPS/CUDA OOM on long candidate lists (Apple MPS
+        # rejects matmul kernels above ~2^28 elements; 16 pairs is safe).
+        batch_size = int(os.getenv("RERANK_BATCH_SIZE", "16"))
+        scores: list[float] = []
+        for i in range(0, len(pairs), batch_size):
+            chunk = pairs[i : i + batch_size]
+            raw = reranker.compute_score(chunk, normalize=True)
+            if isinstance(raw, float):
+                raw = [raw]
+            scores.extend(float(s) for s in raw)
     except Exception as exc:
         log.warning("Reranker scoring failed, returning retrieval order: %s", exc)
         return [

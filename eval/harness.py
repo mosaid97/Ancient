@@ -23,6 +23,10 @@ import time
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)-8s %(name)s %(message)s",
@@ -34,8 +38,8 @@ log = logging.getLogger(__name__)
 def _connect_neo4j():
     from neo4j import GraphDatabase
     uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-    user = os.getenv("NEO4J_USER", "neo4j")
-    password = os.getenv("NEO4J_PASSWORD", "password")
+    user = os.getenv("NEO4J_USERNAME", os.getenv("NEO4J_USER", "neo4j"))
+    password = os.getenv("NEO4J_PASSWORD", "AncientChina")
     return GraphDatabase.driver(uri, auth=(user, password))
 
 
