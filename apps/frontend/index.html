@@ -1501,23 +1501,46 @@
 
       <!-- Center: image with hover overlays -->
       <div class="flex-1 flex flex-col h-full overflow-hidden bg-slate-100">
+        <!-- Toolbar -->
+        <div x-show="iaPage" class="flex items-center gap-2 px-4 py-2 bg-white border-b border-slate-200 flex-shrink-0">
+          <span class="text-xs text-slate-400 cjk" x-text="t('interactive.imageVariant')"></span>
+          <button @click="setImageVariant('preprocessed')"
+                  :class="iaImageVariant !== 'original' ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                  class="px-2 py-0.5 rounded text-xs cjk transition-colors" x-text="t('interactive.preprocessed')"></button>
+          <button @click="setImageVariant('original')"
+                  :class="iaImageVariant === 'original' ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                  class="px-2 py-0.5 rounded text-xs cjk transition-colors" x-text="t('interactive.original')"></button>
+          <div class="ml-auto flex items-center gap-1.5" x-show="iaSelected">
+            <span class="text-xs text-amber-600 cjk font-medium">
+              ✓ <span x-text="t('interactive.regionSelected')"></span> #<span x-text="iaSelected ? iaSelected.idx + 1 : ''"></span>
+            </span>
+            <button @click="iaSelected = null" class="text-xs text-slate-400 hover:text-slate-600 leading-none">✕</button>
+          </div>
+        </div>
         <div x-show="!iaPage" class="flex flex-col items-center justify-center h-full text-center">
           <div class="watermark-char mb-4 opacity-30 select-none">覽</div>
-          <p class="text-slate-400 text-sm cjk" x-text="t('interactive.hoverHint')"></p>
+          <p class="text-slate-400 text-sm cjk" x-text="t('interactive.clickHint')"></p>
         </div>
         <div x-show="iaPage" class="flex-1 overflow-auto scrollable p-6 flex items-start justify-center">
           <div class="relative inline-block" x-ref="iaImageWrap">
-            <img x-show="iaPage" :src="iaPage ? iaPage.image_url : ''" x-ref="iaImage"
+            <img x-show="iaPage" :src="iaCurrentImageUrl" x-ref="iaImage"
                  @load="iaImageLoaded()" class="max-w-full rounded shadow-lg block" />
             <!-- Overlays -->
             <template x-for="(region, idx) in (iaPage ? iaPage.regions : [])" :key="idx">
-              <div class="absolute border border-teal-400/40 hover:bg-teal-400/20 hover:border-teal-500 transition-colors cursor-pointer"
+              <div class="absolute transition-colors cursor-pointer"
+                   :class="iaSelected && iaSelected.idx === idx
+                     ? 'bg-amber-300/30 border-2 border-amber-500'
+                     : 'border border-teal-400/40 hover:bg-teal-400/20 hover:border-teal-500'"
                    :style="regionStyle(region)"
-                   @mouseenter="iaHover = region" @mouseleave="iaHover === region ? iaHover = null : null">
+                   @mouseenter="iaHover = region" @mouseleave="iaHover === region ? iaHover = null : null"
+                   @click="selectRegion(region, idx)">
+                <span x-show="iaCommentCountFor(idx) > 0"
+                      class="absolute -top-2 -right-2 w-4 h-4 bg-teal-600 text-white text-xs rounded-full flex items-center justify-center leading-none pointer-events-none"
+                      x-text="iaCommentCountFor(idx)"></span>
               </div>
             </template>
-            <!-- Hover callout -->
-            <div x-show="iaHover" x-transition
+            <!-- Hover callout (hidden when a region is selected) -->
+            <div x-show="iaHover && !iaSelected" x-transition
                  class="absolute z-30 bg-slate-900 text-white text-xs rounded-lg px-3 py-2 max-w-xs shadow-xl pointer-events-none cjk leading-relaxed"
                  :style="calloutStyle(iaHover)">
               <span x-text="iaHover ? (iaHover.text || '（無文字）') : ''"></span>
@@ -1526,30 +1549,69 @@
         </div>
       </div>
 
-      <!-- Right: comments + chat -->
+      <!-- Right: tabs (Ask | Notes | History) -->
       <div x-show="iaPage" class="w-80 flex-shrink-0 bg-white border-l border-slate-200 flex flex-col h-full">
-        <!-- Ask panel -->
-        <div class="border-b border-slate-200 p-4">
-          <div class="flex gap-2">
-            <input x-model="iaAskQuery" @keydown.enter="askDocument()" type="text"
-                   :placeholder="t('interactive.ask')"
-                   class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm cjk focus:outline-none focus:ring-1 focus:ring-teal-500" />
-            <button @click="askDocument()" class="px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm cjk" x-text="t('interactive.send')"></button>
+        <!-- Tab strip -->
+        <div class="flex border-b border-slate-200 flex-shrink-0">
+          <button @click="iaTab = 'ask'"
+                  :class="iaTab === 'ask' ? 'border-b-2 border-teal-600 text-teal-700 font-medium' : 'text-slate-500 hover:text-slate-700'"
+                  class="flex-1 py-2.5 text-xs cjk transition-colors" x-text="t('interactive.tabAsk')"></button>
+          <button @click="iaTab = 'notes'"
+                  :class="iaTab === 'notes' ? 'border-b-2 border-teal-600 text-teal-700 font-medium' : 'text-slate-500 hover:text-slate-700'"
+                  class="flex-1 py-2.5 text-xs cjk transition-colors" x-text="t('interactive.tabNotes')"></button>
+          <button @click="iaTab = 'history'; loadHistory()"
+                  :class="iaTab === 'history' ? 'border-b-2 border-teal-600 text-teal-700 font-medium' : 'text-slate-500 hover:text-slate-700'"
+                  class="flex-1 py-2.5 text-xs cjk transition-colors" x-text="t('interactive.tabHistory')"></button>
+        </div>
+
+        <!-- Ask tab -->
+        <div x-show="iaTab === 'ask'" class="flex-1 flex flex-col overflow-hidden">
+          <div class="p-4 border-b border-slate-100 flex-shrink-0">
+            <div class="flex gap-2">
+              <input x-model="iaAskQuery" @keydown.enter="askDocument()" type="text"
+                     :placeholder="t('interactive.ask')"
+                     class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm cjk focus:outline-none focus:ring-1 focus:ring-teal-500" />
+              <button @click="askDocument()" class="px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm cjk" x-text="t('interactive.send')"></button>
+            </div>
           </div>
-          <div class="mt-3 space-y-2 max-h-48 overflow-y-auto scrollable">
+          <div class="flex-1 overflow-y-auto scrollable p-4 space-y-2">
             <template x-for="hit in iaAnswers" :key="hit.chunk_id">
               <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
                 <p class="text-xs text-slate-700 cjk leading-relaxed line-clamp-4" x-text="hit.text"></p>
                 <div class="text-xs text-slate-400 mt-1 cjk" x-text="hit.citation || ''"></div>
               </div>
             </template>
+            <div x-show="iaAnswers.length === 0" class="text-center text-slate-400 text-xs cjk py-8 opacity-60" x-text="t('interactive.ask')"></div>
           </div>
         </div>
-        <!-- Comments -->
-        <div class="flex-1 flex flex-col overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-200 text-xs font-semibold text-slate-500 cjk" x-text="t('interactive.comments')"></div>
+
+        <!-- Notes tab -->
+        <div x-show="iaTab === 'notes'" class="flex-1 flex flex-col overflow-hidden">
+          <!-- Selected region text block -->
+          <div x-show="iaSelected" class="p-4 bg-amber-50 border-b border-amber-100 flex-shrink-0">
+            <div class="text-xs font-semibold text-amber-700 mb-1 cjk">
+              <span x-text="t('interactive.selectedRegion')"></span> #<span x-text="iaSelected ? iaSelected.idx + 1 : ''"></span>
+            </div>
+            <p class="text-xs text-slate-700 cjk leading-relaxed line-clamp-6"
+               x-text="iaSelected ? (iaSelected.region.text || '（無文字）') : ''"></p>
+          </div>
+          <!-- Comments list -->
           <div class="flex-1 overflow-y-auto scrollable p-4 space-y-2">
-            <template x-for="c in iaComments" :key="c.id">
+            <!-- Region-specific comments when a region is selected -->
+            <template x-if="iaSelected && iaRegionComments.length > 0">
+              <div class="mb-3">
+                <div class="text-xs font-semibold text-amber-600 mb-2 cjk" x-text="t('interactive.regionNotes')"></div>
+                <template x-for="c in iaRegionComments" :key="c.id">
+                  <div class="bg-amber-50 rounded-lg p-2 border border-amber-100 mb-2">
+                    <p class="text-xs text-slate-700 cjk" x-text="c.text"></p>
+                    <div class="text-xs text-slate-400 mt-1" x-text="c.author"></div>
+                  </div>
+                </template>
+              </div>
+            </template>
+            <!-- Page-level comments -->
+            <div class="text-xs font-semibold text-slate-400 mb-2 cjk" x-text="t('interactive.pageNotes')"></div>
+            <template x-for="c in iaPageComments" :key="c.id">
               <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
                 <p class="text-xs text-slate-700 cjk" x-text="c.text"></p>
                 <div class="text-xs text-slate-400 mt-1" x-text="c.author"></div>
@@ -1557,11 +1619,37 @@
             </template>
             <div x-show="iaComments.length === 0" class="text-center text-slate-400 text-xs cjk py-4" x-text="t('interactive.noComments')"></div>
           </div>
-          <div class="p-3 border-t border-slate-200 flex gap-2">
-            <input x-model="iaCommentText" @keydown.enter="addComment()" type="text"
-                   :placeholder="t('interactive.addComment')"
-                   class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm cjk focus:outline-none focus:ring-1 focus:ring-teal-500" />
-            <button @click="addComment()" class="px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm cjk" x-text="t('common.submit')"></button>
+          <!-- Add note -->
+          <div class="p-3 border-t border-slate-200 flex-shrink-0">
+            <div x-show="iaSelected" class="text-xs text-amber-600 mb-1.5 cjk">
+              <span x-text="t('interactive.noteForRegion')"></span> #<span x-text="iaSelected ? iaSelected.idx + 1 : ''"></span>
+            </div>
+            <div class="flex gap-2">
+              <input x-model="iaCommentText" @keydown.enter="addComment()" type="text"
+                     :placeholder="t('interactive.addComment')"
+                     class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm cjk focus:outline-none focus:ring-1 focus:ring-teal-500" />
+              <button @click="addComment()" class="px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm cjk" x-text="t('common.submit')"></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- History tab -->
+        <div x-show="iaTab === 'history'" class="flex-1 flex flex-col overflow-hidden">
+          <div class="flex-1 overflow-y-auto scrollable p-4 space-y-2">
+            <div x-show="iaHistoryLoading" class="text-center text-slate-400 text-xs cjk py-8">…</div>
+            <template x-for="(evt, i) in iaHistory" :key="i">
+              <div class="bg-slate-50 rounded-lg p-2.5 border border-slate-100">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-medium text-teal-700" x-text="evt.event_type"></span>
+                  <span x-show="evt.region_idx != null" class="text-xs text-amber-600">
+                    #<span x-text="evt.region_idx != null ? evt.region_idx + 1 : ''"></span>
+                  </span>
+                </div>
+                <div class="text-xs text-slate-400 mt-0.5 truncate cjk" x-text="evt.created_at_fmt || ''"></div>
+              </div>
+            </template>
+            <div x-show="!iaHistoryLoading && iaHistory.length === 0"
+                 class="text-center text-slate-400 text-xs cjk py-8" x-text="t('interactive.noHistory')"></div>
           </div>
         </div>
       </div>
@@ -1723,11 +1811,17 @@
         iaPages: [],
         iaPage: null,
         iaHover: null,
+        iaSelected: null,
         iaScale: 1,
         iaComments: [],
         iaCommentText: '',
         iaAskQuery: '',
         iaAnswers: [],
+        iaTab: 'ask',
+        iaHistory: [],
+        iaHistoryLoading: false,
+        iaImageVariant: 'preprocessed',
+        iaSessionId: Math.random().toString(36).slice(2),
 
         // Search
         query: '',
@@ -2064,6 +2158,7 @@
         async selectInteractiveDoc(docId) {
           this.iaDoc = this.interactiveDocs.find(d => d.id === docId) || { id: docId };
           this.iaPage = null;
+          this.iaSelected = null;
           try {
             const res = await fetch(`/api/documents/${encodeURIComponent(docId)}/pages?only_with_layout=true`);
             const data = await res.json();
@@ -2073,12 +2168,17 @@
 
         async selectInteractivePage(pageId) {
           this.iaHover = null;
+          this.iaSelected = null;
+          this.iaTab = 'ask';
+          this.iaHistory = [];
           try {
             const res = await fetch(`/api/interactive/page/${encodeURIComponent(pageId)}`);
             this.iaPage = await res.json();
             this.iaComments = this.iaPage.comments || [];
             this.iaAnswers = [];
             this.iaScale = 1;
+            this.iaImageVariant = this.iaPage.image_variant || 'preprocessed';
+            this.logInteraction('page_view', null);
           } catch (e) { this.showToast(this.t('toast.failedLoadPage'), 'error'); }
         },
 
@@ -2087,6 +2187,67 @@
           if (img && img.naturalWidth) {
             this.iaScale = img.clientWidth / img.naturalWidth;
           }
+        },
+
+        get iaCurrentImageUrl() {
+          if (!this.iaPage) return '';
+          const pid = this.iaPage.page_id;
+          return `/api/image/${pid}?variant=${this.iaImageVariant === 'original' ? 'original' : 'preprocessed'}`;
+        },
+
+        get iaRegionComments() {
+          if (!this.iaSelected) return [];
+          return this.iaComments.filter(c => c.region_idx === this.iaSelected.idx);
+        },
+
+        get iaPageComments() {
+          return this.iaComments.filter(c => c.region_idx == null);
+        },
+
+        iaCommentCountFor(idx) {
+          return this.iaComments.filter(c => c.region_idx === idx).length;
+        },
+
+        selectRegion(region, idx) {
+          if (this.iaSelected && this.iaSelected.idx === idx) {
+            this.iaSelected = null;
+          } else {
+            this.iaSelected = { region, idx };
+            this.iaTab = 'notes';
+            this.logInteraction('region_click', idx);
+          }
+        },
+
+        setImageVariant(variant) {
+          this.iaImageVariant = variant;
+        },
+
+        logInteraction(eventType, regionIdx) {
+          if (!this.iaPage) return;
+          fetch('/api/interactive/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              page_id: this.iaPage.page_id,
+              event_type: eventType,
+              region_idx: regionIdx,
+              session_id: this.iaSessionId,
+            }),
+          }).catch(() => {});
+        },
+
+        async loadHistory() {
+          if (!this.iaDoc || this.iaHistoryLoading) return;
+          this.iaHistoryLoading = true;
+          try {
+            const res = await fetch(`/api/interactive/history/${encodeURIComponent(this.iaDoc.id)}?limit=50`);
+            const data = await res.json();
+            this.iaHistory = (data.events || []).map(e => ({
+              ...e,
+              created_at_fmt: e.created_at ? new Date(e.created_at).toLocaleString() : '',
+            }));
+          } catch (e) { this.iaHistory = []; }
+          finally { this.iaHistoryLoading = false; }
         },
 
         regionStyle(region) {
@@ -2104,13 +2265,24 @@
 
         async addComment() {
           if (!this.iaCommentText.trim() || !this.iaPage) return;
+          const regionIdx = this.iaSelected ? this.iaSelected.idx : null;
           try {
             await this._authFetch('/api/interactive/comment', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ page_id: this.iaPage.page_id, text: this.iaCommentText }),
+              body: JSON.stringify({
+                page_id: this.iaPage.page_id,
+                text: this.iaCommentText,
+                region_idx: regionIdx,
+              }),
             });
-            this.iaComments.push({ id: Date.now(), text: this.iaCommentText, author: 'anonymous' });
+            this.iaComments.push({
+              id: Date.now(),
+              text: this.iaCommentText,
+              author: 'anonymous',
+              region_idx: regionIdx,
+            });
             this.iaCommentText = '';
+            this.logInteraction('comment', regionIdx);
           } catch (e) { this.showToast(this.t('toast.commentFailed'), 'error'); }
         },
 

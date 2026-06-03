@@ -1,6 +1,0 @@
-2026-05-30 00:09:06,371 INFO     job=e291ffb29637453c doc_id=附件一：学位论文出版授权书__9daacff06d path=附件一：学位论文出版授权书.pdf ocr_required=True model=qwen
-2026-05-30 00:09:06,479 INFO     pdf_reader: 附件一：学位论文出版授权书.pdf (pages=1, ingesting=1, dpi=400, doc_id=附件一：学位论文出版授权书__9daacff06d)
-2026-05-30 00:09:06,527 INFO     structure: falling back to synthetic plan for /Users/mohasani/Ancient/staging/e291ffb29637453c/附件一：学位论文出版授权书.pdf (backend=pdf, num_pages=1)
-2026-05-30 00:09:06,613 INFO     ingested 1 pages (0 ocr, 1 native)
-2026-05-30 00:09:06,663 INFO     Skipping OCR (ocr_required=True, ocr_pages=0)
-2026-05-30 00:09:06,686 INFO     === job e291ffb29637453c done in 0.3 s — awaiting_review ===

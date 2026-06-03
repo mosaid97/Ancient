@@ -49,10 +49,16 @@ class _SentenceTransformerReranker:
 def _get_reranker():
     global _reranker_instance, _reranker_type
     if _reranker_instance is None:
-        # Try primary BGE model first
+        # Try primary BGE model first.
+        # bge-reranker-v2-gemma is an LLM-based (decoder-only) reranker → requires
+        # FlagLLMReranker, NOT FlagReranker (which is encoder-only and fails with
+        # GemmaTokenizer).  Run offline so startup doesn't attempt hub.hf.co.
         try:
-            from FlagEmbedding import FlagReranker  # type: ignore[import]
-            _reranker_instance = FlagReranker(_RERANKER_MODEL, use_fp16=True)
+            import os
+            os.environ.setdefault("HF_DATASETS_OFFLINE", "1")
+            os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+            from FlagEmbedding import FlagLLMReranker  # type: ignore[import]
+            _reranker_instance = FlagLLMReranker(_RERANKER_MODEL, use_fp16=True)
             _reranker_type = "bge"
             log.info("Loaded reranker: %s", _RERANKER_MODEL)
         except Exception as exc:

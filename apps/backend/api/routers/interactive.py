@@ -1,15 +1,10 @@
-"""Interactive hover dashboard router (Track E, Feature 5).
+"""Interactive hover dashboard router.
 
-Serves the data behind the hover-to-reveal OCR view:
-
-- ``GET  /api/interactive/page/{page_id}`` — preprocessed image URL +
-  parsed ``PAGE.layoutJson`` regions (bbox in preprocessed-image pixel
-  coordinates + per-region OCR text) + the page's fused text + saved
-  comments. The frontend scales each bbox by ``rendered/natural`` image
-  size and shows the region text on hover.
-- ``POST /api/interactive/comment`` — append a ``COMMENT`` node to a page.
-- ``POST /api/interactive/ask`` — document-scoped retrieval (right-panel
-  chat/search), reusing the dense search and filtering to one document.
+- ``GET  /api/interactive/page/{page_id}``  — image URL + layout regions + comments
+- ``POST /api/interactive/comment``         — append a COMMENT node (optionally region-scoped)
+- ``POST /api/interactive/ask``             — document-scoped retrieval
+- ``POST /api/interactive/log``             — fire-and-forget interaction event
+- ``GET  /api/interactive/history/{doc_id}``— recent interaction log for a document
 """
 from __future__ import annotations
 
@@ -18,7 +13,7 @@ import logging
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from neo4j import Driver
 from pydantic import BaseModel
 
@@ -61,14 +56,13 @@ async def page_regions(page_id: str, driver: Driver = Depends(get_driver)) -> di
                     continue
                 regions.append({
                     "label": r.get("label", "text"),
-                    "bbox": bbox,  # [x, y, w, h] in preprocessed pixel space
+                    "bbox": bbox,
                     "text": r.get("text", ""),
                     "table_html": r.get("table_html"),
                 })
         except (json.JSONDecodeError, TypeError) as exc:
             log.warning("layoutJson parse failed for %s: %s", page_id, exc)
 
-    # Prefer the preprocessed variant because layout bboxes are in its space.
     image_variant = "preprocessed" if row["preprocessed_uri"] else "original"
 
     with driver.session() as s:
@@ -78,7 +72,7 @@ async def page_regions(page_id: str, driver: Driver = Depends(get_driver)) -> di
                 """
                 MATCH (p:PAGE {id: $pid})-[:HAS_COMMENT]->(c:COMMENT)
                 RETURN c.id AS id, c.text AS text, c.author AS author,
-                       c.createdAt AS created_at
+                       c.regionIdx AS region_idx, c.createdAt AS created_at
                 ORDER BY c.createdAt
                 """,
                 pid=page_id,
@@ -104,11 +98,12 @@ class CommentIn(BaseModel):
     page_id: str
     text: str
     author: str | None = "anonymous"
+    region_idx: int | None = None
 
 
 @router.post("/comment")
 async def add_comment(payload: CommentIn, driver: Driver = Depends(get_driver)) -> dict[str, Any]:
-    """Attach a COMMENT node to a page (interactive-view annotations)."""
+    """Attach a COMMENT node to a page, optionally scoped to a region."""
     if not payload.text.strip():
         raise HTTPException(status_code=400, detail="comment text is empty")
     comment_id = uuid.uuid4().hex[:16]
@@ -118,12 +113,14 @@ async def add_comment(payload: CommentIn, driver: Driver = Depends(get_driver)) 
             MATCH (p:PAGE {id: $pid})
             MERGE (c:COMMENT {id: $cid})
             ON CREATE SET c.text = $text, c.author = $author,
-                          c.pageId = $pid, c.createdAt = timestamp()
+                          c.pageId = $pid, c.regionIdx = $region_idx,
+                          c.createdAt = timestamp()
             MERGE (p)-[:HAS_COMMENT]->(c)
             RETURN c.id AS id
             """,
             pid=payload.page_id, cid=comment_id,
             text=payload.text.strip(), author=payload.author or "anonymous",
+            region_idx=payload.region_idx,
         ).single()
     if row is None:
         raise HTTPException(status_code=404, detail=f"Page {payload.page_id!r} not found")
@@ -171,3 +168,61 @@ async def ask_document(payload: AskIn, driver: Driver = Depends(get_driver)) -> 
             break
 
     return {"document_id": payload.document_id, "query": payload.query, "hits": hits}
+
+
+class LogIn(BaseModel):
+    page_id: str
+    event_type: str  # "page_view" | "region_click" | "comment"
+    region_idx: int | None = None
+    session_id: str | None = None
+
+
+@router.post("/log")
+async def log_interaction(payload: LogIn, driver: Driver = Depends(get_driver)) -> dict[str, Any]:
+    """Record a user interaction event for analytics and engine improvement."""
+    log_id = uuid.uuid4().hex[:16]
+    try:
+        with driver.session() as s:
+            s.run(
+                """
+                MATCH (p:PAGE {id: $pid})
+                CREATE (l:INTERACTION_LOG {
+                    id: $lid,
+                    pageId: $pid,
+                    documentId: p.documentId,
+                    eventType: $event_type,
+                    regionIdx: $region_idx,
+                    sessionId: $session_id,
+                    createdAt: timestamp()
+                })
+                """,
+                pid=payload.page_id, lid=log_id,
+                event_type=payload.event_type,
+                region_idx=payload.region_idx,
+                session_id=payload.session_id,
+            )
+    except Exception as exc:  # noqa: BLE001
+        log.debug("log_interaction non-fatal: %s", exc)
+    return {"ok": True}
+
+
+@router.get("/history/{document_id}")
+async def get_history(
+    document_id: str,
+    limit: int = Query(50, le=200),
+    driver: Driver = Depends(get_driver),
+) -> dict[str, Any]:
+    """Return recent interaction log events for a document."""
+    with driver.session() as s:
+        rows = s.run(
+            """
+            MATCH (l:INTERACTION_LOG {documentId: $did})
+            RETURN l.eventType AS event_type, l.regionIdx AS region_idx,
+                   l.sessionId AS session_id, l.pageId AS page_id,
+                   l.createdAt AS created_at
+            ORDER BY l.createdAt DESC
+            LIMIT $limit
+            """,
+            did=document_id, limit=limit,
+        ).data()
+    return {"document_id": document_id, "events": rows, "total": len(rows)}

@@ -22,15 +22,30 @@ from apps.backend.agents.verifier import VerifierResult, verify_cite
 
 log = logging.getLogger(__name__)
 
-_CHUNK_TEXT_QUERY = """
+_CHUNK_SPINE_QUERY = """
 MATCH (c:CHUNK {id: $chunk_id})
+OPTIONAL MATCH (c)<-[:HAS]-(p:PAGE)
+OPTIONAL MATCH (p)<-[:INCLUDE]-(sec:SECTION)
+OPTIONAL MATCH (sec)<-[:INCLUDE]-(ch:CHAPTER)
+OPTIONAL MATCH (ch)<-[:CONSIST_OF]-(d:DOCUMENT)
+OPTIONAL MATCH (d)<-[:CONTAIN]-(t:TOPIC)
 RETURN
   coalesce(c.textCanonical, c.text) AS text,
-  c.tier AS tier,
-  c.language AS language,
-  c.pageId AS page_id,
-  c.documentId AS document_id,
-  c.chunkIndex AS chunk_index
+  c.tier                            AS tier,
+  c.language                        AS language,
+  c.pageId                          AS page_id,
+  c.documentId                      AS document_id,
+  c.chunkIndex                      AS chunk_index,
+  p.docPageIndex                    AS page_index,
+  p.mode                            AS page_mode,
+  sec.title                         AS section_title,
+  ch.title                          AS chapter_title,
+  ch.ordinal                        AS chapter_ordinal,
+  d.title                           AS document_title,
+  d.primaryAuthor                   AS document_author,
+  d.edition                         AS document_edition,
+  d.publicationPeriod               AS document_publication_period,
+  t.name                            AS topic
 """
 
 
@@ -47,6 +62,17 @@ class RibbonResult:
     retrieval_score: float
     rerank_score: float
     verifier: VerifierResult
+    # Source provenance — populated from full spine walk
+    page_index: int | None = None
+    page_mode: str | None = None
+    section_title: str | None = None
+    chapter_title: str | None = None
+    chapter_ordinal: int | None = None
+    document_title: str | None = None
+    document_author: str | None = None
+    document_edition: str | None = None
+    document_publication_period: str | None = None
+    topic: str | None = None
 
     @property
     def verified(self) -> bool:
@@ -55,6 +81,20 @@ class RibbonResult:
     @property
     def evidence_strength(self) -> str | None:
         return self.verifier.evidence_strength
+
+    @property
+    def citation(self) -> str:
+        parts: list[str] = []
+        if self.document_title:
+            parts.append(self.document_title)
+        if self.chapter_title:
+            label = f"卷{self.chapter_ordinal}" if self.chapter_ordinal else self.chapter_title
+            parts.append(label)
+        if self.section_title:
+            parts.append(self.section_title)
+        if self.page_index is not None:
+            parts.append(f"p.{self.page_index + 1}")
+        return "《" + "·".join(parts) + "》" if parts else "(unknown)"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -69,6 +109,18 @@ class RibbonResult:
             "verified": self.verified,
             "evidenceStrength": self.evidence_strength,
             "verifierOutcome": self.verifier.outcome,
+            # Source provenance
+            "citation": self.citation,
+            "documentTitle": self.document_title,
+            "documentAuthor": self.document_author,
+            "documentEdition": self.document_edition,
+            "documentPublicationPeriod": self.document_publication_period,
+            "chapterTitle": self.chapter_title,
+            "chapterOrdinal": self.chapter_ordinal,
+            "sectionTitle": self.section_title,
+            "pageIndex": self.page_index,
+            "pageMode": self.page_mode,
+            "topic": self.topic,
         }
 
 
@@ -129,9 +181,9 @@ def build_response(
         ):
             break
 
-        # Fetch chunk text + metadata
+        # Fetch chunk text + full spine provenance in one round-trip
         with driver.session() as s:
-            rows = s.run(_CHUNK_TEXT_QUERY, chunk_id=result.chunk_id).data()
+            rows = s.run(_CHUNK_SPINE_QUERY, chunk_id=result.chunk_id).data()
         if not rows:
             continue
         row = rows[0]
@@ -155,6 +207,16 @@ def build_response(
             retrieval_score=result.retrieval_score,
             rerank_score=result.rerank_score,
             verifier=verifier_result,
+            page_index=row.get("page_index"),
+            page_mode=row.get("page_mode"),
+            section_title=row.get("section_title"),
+            chapter_title=row.get("chapter_title"),
+            chapter_ordinal=row.get("chapter_ordinal"),
+            document_title=row.get("document_title"),
+            document_author=row.get("document_author"),
+            document_edition=row.get("document_edition"),
+            document_publication_period=row.get("document_publication_period"),
+            topic=row.get("topic"),
         )
 
         if tier == "primary":

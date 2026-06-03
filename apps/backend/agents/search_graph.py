@@ -160,14 +160,32 @@ def node_rerank(state: HybridSearchState) -> dict:
     if rerank_ids:
         with driver.session() as s:
             text_rows = s.run(
-                "UNWIND $ids AS cid MATCH (c:CHUNK {id: cid}) "
-                "RETURN c.id AS id, coalesce(c.textCanonical, c.text) AS text",
+                "UNWIND $ids AS cid "
+                "MATCH (c:CHUNK {id: cid}) "
+                "OPTIONAL MATCH (c)<-[:HAS]-(:PAGE)<-[:INCLUDE]-(:SECTION)"
+                "<-[:INCLUDE]-(ch:CHAPTER)<-[:CONSIST_OF]-(d:DOCUMENT) "
+                "RETURN c.id AS id, coalesce(c.textCanonical, c.text) AS text, "
+                "d.title AS document_title, ch.title AS chapter_title, ch.ordinal AS chapter_ordinal",
                 ids=rerank_ids,
             ).data()
     text_map = {r["id"]: r["text"] or "" for r in text_rows}
 
+    def _enrich_for_rerank(row: dict) -> str:
+        """Prepend source header so the cross-encoder can judge in-context relevance."""
+        raw = row.get("text") or ""
+        parts: list[str] = []
+        if row.get("document_title"):
+            parts.append(row["document_title"])
+        if row.get("chapter_title"):
+            ch_label = f"卷{row['chapter_ordinal']}" if row.get("chapter_ordinal") else row["chapter_title"]
+            parts.append(ch_label)
+        prefix = "《" + "·".join(parts) + "》\n" if parts else ""
+        return prefix + raw
+
+    rerank_text_map = {r["id"]: _enrich_for_rerank(r) for r in text_rows}
+
     candidates = [
-        (cid, text_map.get(cid, ""), score_map[cid])
+        (cid, rerank_text_map.get(cid, text_map.get(cid, "")), score_map[cid])
         for cid in rerank_ids
         if text_map.get(cid)
     ]

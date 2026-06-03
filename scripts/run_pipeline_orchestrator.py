@@ -49,23 +49,33 @@ def _neo4j_driver():
     return GraphDatabase.driver(
         os.getenv("NEO4J_URI", "bolt://localhost:7687"),
         auth=(os.getenv("NEO4J_USERNAME", "neo4j"), os.getenv("NEO4J_PASSWORD", "AncientChina")),
+        max_connection_pool_size=5,
+        connection_acquisition_timeout=60,
     )
 
 
 def _translation_coverage() -> tuple[int, int]:
-    """Return (translated_primary, total_primary)."""
-    driver = _neo4j_driver()
-    try:
-        with driver.session() as s:
-            total = s.run(
-                'MATCH (c:CHUNK {tier:"primary"}) RETURN count(c) AS n'
-            ).single()["n"]
-            done = s.run(
-                'MATCH (c:CHUNK {tier:"primary"}) WHERE c.textCanonical IS NOT NULL RETURN count(c) AS n'
-            ).single()["n"]
-        return done, total
-    finally:
-        driver.close()
+    """Return (translated_primary, total_primary), retrying on auth rate limit."""
+    backoff = 30
+    for attempt in range(10):
+        try:
+            driver = _neo4j_driver()
+            try:
+                with driver.session() as s:
+                    total = s.run(
+                        'MATCH (c:CHUNK {tier:"primary"}) RETURN count(c) AS n'
+                    ).single()["n"]
+                    done = s.run(
+                        'MATCH (c:CHUNK {tier:"primary"}) WHERE c.textCanonical IS NOT NULL RETURN count(c) AS n'
+                    ).single()["n"]
+                return done, total
+            finally:
+                driver.close()
+        except Exception as exc:
+            log.warning("_translation_coverage attempt %d failed (%s) — retry in %ds", attempt + 1, exc, backoff)
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 300)
+    raise RuntimeError("_translation_coverage: all retries exhausted")
 
 
 def _run(cmd: list[str], label: str) -> bool:
