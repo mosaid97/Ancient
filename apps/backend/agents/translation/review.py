@@ -87,6 +87,38 @@ class ReviewResult:
 _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 
 
+def _parse_verdict(raw: str) -> dict:
+    """Parse an LLM JSON verdict tolerantly, handling common malformations."""
+    # 1. Strip raw control characters invalid inside JSON strings
+    cleaned = re.sub(r'[\x00-\x1f]', lambda c: repr(c.group())[1:-1], raw)
+    # 2. Try strict JSON first
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+    # 3. Replace single-quoted keys/values with double quotes.
+    #    Pattern: replace 'word' only when it appears as a key or simple value,
+    #    being careful not to clobber apostrophes inside Chinese text.
+    single_to_double = re.sub(
+        r"(?<![\\])'([^']*)'",
+        lambda m: '"' + m.group(1).replace('"', '\\"') + '"',
+        cleaned,
+    )
+    try:
+        return json.loads(single_to_double)
+    except json.JSONDecodeError:
+        pass
+    # 4. Last resort: extract the three fields individually via regex
+    ok_m = re.search(r'"?ok"?\s*:\s*(true|false)', single_to_double, re.I)
+    issues_m = re.search(r'"?issues"?\s*:\s*(\[.*?\])', single_to_double, re.DOTALL)
+    revised_m = re.search(r'"?revised"?\s*:\s*"(.*?)"(?=\s*[,}])', single_to_double, re.DOTALL)
+    return {
+        "ok": ok_m.group(1).lower() == "true" if ok_m else True,
+        "issues": json.loads(issues_m.group(1)) if issues_m else [],
+        "revised": revised_m.group(1) if revised_m else "",
+    }
+
+
 def _call_review_pass(
     pass_name: str,
     instruction: str,
@@ -118,7 +150,7 @@ def _call_review_pass(
 
         m = _JSON_RE.search(raw)
         if m:
-            verdict = json.loads(m.group())
+            verdict = _parse_verdict(m.group())
         else:
             verdict = {"ok": True, "issues": [], "revised": translation}
 

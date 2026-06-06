@@ -95,9 +95,13 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _handle_signal)
 
     while not stop["flag"]:
+        done_so_far = total_ok + total_failed + total_skipped
+        limit = args.batch_size
+        if args.max_chunks:
+            limit = min(limit, args.max_chunks - done_so_far)
         report: TranslationReport = translate_chunks(
             driver,
-            limit=args.batch_size,
+            limit=limit,
             tier_filter=args.tier,
             recompute=args.recompute,
             workers=args.workers,
