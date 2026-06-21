@@ -42,8 +42,10 @@ neo4j_logs/
 neo4j_import/
 minio_data/
 
-# IDE
-.cursor/settings.json
+# IDE / tooling config (not useful to contributors)
+.cursor/
+.claude/
+.mcp.json
 .idea/
 *.swp
 *.swo
