@@ -52,7 +52,7 @@ def _connect():
     return GraphDatabase.driver(
         os.getenv("NEO4J_URI", "bolt://localhost:7687"),
         auth=(os.getenv("NEO4J_USERNAME", "neo4j"), os.getenv("NEO4J_PASSWORD", "AncientChina")),
-        max_connection_pool_size=10,
+        max_connection_pool_size=20,
         connection_acquisition_timeout=60,
     )
 

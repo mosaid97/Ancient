@@ -18,6 +18,10 @@ raw/
 # Data blobs (keep data/seeds/ and data/bench/ — exclude large binary dumps)
 data/blobs/
 data/paddle_corpus/
+data/*.db
+
+# Evaluation outputs (generated at runtime)
+eval_out/
 
 # Notebook artifacts (generated outputs, not source)
 notebooks/_artifacts/

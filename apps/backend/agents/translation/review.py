@@ -112,9 +112,15 @@ def _parse_verdict(raw: str) -> dict:
     ok_m = re.search(r'"?ok"?\s*:\s*(true|false)', single_to_double, re.I)
     issues_m = re.search(r'"?issues"?\s*:\s*(\[.*?\])', single_to_double, re.DOTALL)
     revised_m = re.search(r'"?revised"?\s*:\s*"(.*?)"(?=\s*[,}])', single_to_double, re.DOTALL)
+    issues: list = []
+    if issues_m:
+        try:
+            issues = json.loads(issues_m.group(1))
+        except json.JSONDecodeError:
+            issues = []
     return {
         "ok": ok_m.group(1).lower() == "true" if ok_m else True,
-        "issues": json.loads(issues_m.group(1)) if issues_m else [],
+        "issues": issues,
         "revised": revised_m.group(1) if revised_m else "",
     }
 
