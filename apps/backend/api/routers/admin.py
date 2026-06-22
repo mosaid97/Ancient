@@ -11,12 +11,15 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from neo4j import Driver
 
+from apps.backend.api import verifier_metrics
 from apps.backend.api.deps import get_driver
 
 log = logging.getLogger(__name__)
 router = APIRouter()
 
-_LOGS_DIR = Path(__file__).resolve().parents[4] / "logs"
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_LOGS_DIR = _REPO_ROOT / "logs"
+_EVAL_OUT = _REPO_ROOT / "eval_out"
 
 
 # ---------------------------------------------------------------------------
@@ -443,3 +446,101 @@ async def job_logs(job_key: str, lines: int = 50) -> dict[str, Any]:
         return {"lines": [], "path": str(log_path)}
     all_lines = log_path.read_text(errors="replace").splitlines()
     return {"lines": all_lines[-lines:], "total_lines": len(all_lines)}
+
+
+# ---------------------------------------------------------------------------
+# Trust signals: verifier outcomes + last eval-harness metrics
+# ---------------------------------------------------------------------------
+
+
+@router.get("/verification")
+async def verification_stats(driver: Driver = Depends(get_driver)) -> dict[str, Any]:
+    """In-process verifier outcome counters + recent failure samples.
+
+    Used by the dashboard to show users how often the citation gate
+    actually passes — a direct trust signal. The numbers reset on
+    server restart; for historical trends use ``/api/admin/eval``.
+    """
+    snap = verifier_metrics.snapshot()
+
+    # Augment with the total number of persisted VERIFIER_FAILURE nodes
+    # (cumulative, across all process lifetimes) broken down by mode.
+    failures_by_mode: dict[str, int] = {}
+    try:
+        rows = _run(driver, """
+            MATCH (f:VERIFIER_FAILURE)
+            RETURN f.failureMode AS mode, count(*) AS n
+        """)
+        for r in rows:
+            failures_by_mode[r["mode"] or "unknown"] = r["n"]
+    except Exception as exc:
+        log.warning("verification_stats: VERIFIER_FAILURE rollup unavailable: %s", exc)
+
+    snap["persisted_failures_by_mode"] = failures_by_mode
+    return snap
+
+
+@router.get("/eval")
+async def eval_metrics() -> dict[str, Any]:
+    """Latest eval-harness metrics + timestamp.
+
+    Reads ``eval_out/metrics.json`` written by ``eval/harness.py``. Returns
+    a UI-friendly subset: NDCG@k, Recall@k, MRR (with bootstrap CIs),
+    faithfulness verified_rate, linking precision/recall — plus the
+    ``eval_timestamp`` so the dashboard can show "last evaluated …".
+    Returns ``available=False`` when the file hasn't been written yet.
+    """
+    metrics_path = _EVAL_OUT / "metrics.json"
+    if not metrics_path.exists():
+        return {
+            "available": False,
+            "message": "Run `uv run python -m eval.harness` to generate metrics.",
+        }
+
+    try:
+        raw = json.loads(metrics_path.read_text())
+    except Exception as exc:
+        log.warning("eval_metrics: failed to parse %s: %s", metrics_path, exc)
+        return {"available": False, "error": str(exc)}
+
+    search = raw.get("search") or {}
+
+    def _ci(d: dict[str, Any] | None) -> dict[str, Any] | None:
+        if not d:
+            return None
+        return {
+            "mean": d.get("mean"),
+            "ci_low": d.get("ci_low"),
+            "ci_high": d.get("ci_high"),
+            "n": d.get("n"),
+        }
+
+    def _slice(label: str) -> dict[str, Any] | None:
+        s = search.get(label)
+        if not s:
+            return None
+        return {
+            "ndcg_at_k": _ci(s.get("ndcg_at_k")),
+            "recall_at_k": _ci(s.get("recall_at_k")),
+            "precision_at_k": _ci(s.get("precision_at_k")),
+            "mrr": _ci(s.get("mrr")),
+            "duration_ms": _ci(s.get("duration_ms")),
+            "n_queries": s.get("n_queries"),
+        }
+
+    return {
+        "available": True,
+        "eval_timestamp": raw.get("eval_timestamp"),
+        "k": raw.get("k"),
+        "overall": _slice("overall"),
+        "by_tier": {
+            "primary": _slice("tier_primary"),
+            "secondary": _slice("tier_secondary"),
+        },
+        "by_language": {
+            label.removeprefix("lang_"): _slice(label)
+            for label in search.keys() if label.startswith("lang_")
+        },
+        "faithfulness": raw.get("faithfulness"),
+        "linking": raw.get("linking"),
+    }

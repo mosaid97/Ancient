@@ -30,6 +30,7 @@ from apps.backend.agents.verifier import (
     extract_quotable_span,
     verify_cite,
 )
+from apps.backend.api import verifier_metrics
 
 log = logging.getLogger(__name__)
 
@@ -263,6 +264,14 @@ def build_response(
                 span,
                 min_span_chars=min_span_chars,
             )
+
+        verifier_metrics.record(
+            verifier_result.outcome,
+            chunk_id=verifier_result.chunk_id,
+            failure_mode=verifier_result.failure_mode,
+            span=verifier_result.span,
+            tier=verifier_result.tier,
+        )
 
         # Gate: drop chunks that explicitly failed source-presence check.
         # 'translation_match' and 'not_applicable' are kept (they are not
