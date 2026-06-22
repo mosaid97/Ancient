@@ -37,7 +37,8 @@ def _fetch_translation(chunk_ids: list[str], driver: Driver) -> dict[str, dict]:
             ).data()
         return {r["id"]: {"translation_canonical": r["tc"], "translation_vernacular": r["tv"]}
                 for r in rows}
-    except Exception:
+    except Exception as exc:
+        log.warning("translation fetch failed for %d chunks: %s", len(chunk_ids), exc)
         return {}
 
 
@@ -145,7 +146,11 @@ async def search_endpoint(
                 ))
             try:
                 enriched = enrich_with_spine(driver, fake_hits)
-            except Exception:
+            except Exception as exc:
+                log.warning(
+                    "spine enrichment failed for %d hits; citation labels will be (unknown): %s",
+                    len(fake_hits), exc,
+                )
                 enriched = []
             spine_map = {r.hit.chunk_id: r for r in enriched}
 
@@ -178,6 +183,9 @@ async def search_endpoint(
                 "primaryRibbon": primary,
                 "secondaryRibbon": secondary,
                 "duration_ms": resp.duration_ms,
+                "verify_span": resp.verify_span,
+                "gated": resp.gated,
+                "gated_count": resp.gated_count,
             }
 
     # ── Dense-only fallback ───────────────────────────────────────────────────

@@ -41,6 +41,14 @@ def _uri_to_bucket_key(uri: str) -> tuple[str, str]:
     return _DEFAULT_BUCKET, uri
 
 
+# Whitelist the only two PAGE properties that may be selected dynamically.
+# All other dynamic Cypher property interpolation is forbidden — see
+# AGENTS.md §4 (parametrized Cypher only).
+_VARIANT_TO_PROP: dict[str, str] = {
+    "original": "imageUri",
+    "preprocessed": "preprocessedImageUri",
+}
+
 _CONTENT_TYPES = {
     "png": "image/png",
     "jpg": "image/jpeg",
@@ -67,7 +75,16 @@ async def page_image(
         page_id: The Neo4j ``PAGE.id``.
         variant: ``'original'`` (default) or ``'preprocessed'``.
     """
-    prop = "preprocessedImageUri" if variant == "preprocessed" else "imageUri"
+    prop = _VARIANT_TO_PROP.get(variant)
+    if prop is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown variant {variant!r}; expected one of {sorted(_VARIANT_TO_PROP)}",
+        )
+    # `prop` is now guaranteed to be one of two hard-coded property names
+    # from the whitelist above — safe to interpolate. Pure-property
+    # references can't be parametrised in Cypher; the whitelist is what
+    # keeps this injection-proof.
     with driver.session() as s:
         row = s.run(
             f"MATCH (p:PAGE {{id: $pid}}) RETURN p.{prop} AS uri, p.imageUri AS fallback",

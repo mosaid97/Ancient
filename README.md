@@ -1,38 +1,27 @@
-# Ancient China Knowledge Graph
+# Ancient Chinese Search Engine
 
-A research-grade retrieval system for Ancient China primary sources. The pipeline ingests scanned and native PDFs, runs a three-engine OCR with char-level fusion, builds a graph in Neo4j (chunks, keywords, citations, communities), translates classical Chinese into a canonical modern form, and serves a hybrid (BM25 + dense + RRF + cross-encoder rerank) search backed by a **deterministic citation verifier** that gates every claim.
+A research-grade retrieval system for Ancient Chinese primary sources.
+The pipeline ingests scanned and native PDFs, runs three-engine OCR with
+character-level fusion, normalizes classical Chinese through a 7-step
+philological pipeline, builds a Neo4j knowledge graph (chunks, keywords,
+citations, communities), and serves a hybrid (BM25 + dense + RRF +
+cross-encoder rerank) search with a **deterministic citation verifier**
+that gates every result.
 
-The goal is *zero-hallucination retrieval over classical Chinese*: every passage shown in the UI is provably present in a numbered source page.
+The goal is **zero-hallucination retrieval over classical Chinese**:
+every passage shown in the UI is provably present in the OCR'd source —
+modulo philological normalization (T-S, 異體字, 避諱, and optional 通假字).
 
 ---
 
 ## Architecture
 
-![Architecture](docs/architecture.png)
+![End-to-end system architecture](docs/architecture.png)
 
-```mermaid
-flowchart TD
-  raw["raw/ — primary + secondary corpus (PDF)"] --> ingest["ingest: readers + tier + structure (v2.1 spine)"]
-  ingest --> lang1["language detection (native pages)"]
-  ingest --> pre["preprocess: 6-step image chain"]
-  pre --> ocr["3-engine OCR — PaddleOCR + DeepSeek-OCR + Qwen-VL"]
-  ocr --> fuse["char-level fusion → textFused + re-detect language"]
-  fuse --> layout["PP-StructureV3 layout → structuredMarkdown"]
-  layout --> evalcls["evaluator + problem classifier"]
-  evalcls --> hitl["span-level HITL + active learning"]
-  fuse --> trans["translation: canonical + vernacular"]
-  trans --> chunk["chunk (md_section / sliding_window)"]
-  chunk --> embed["embed canonical + vernacular (text-embedding-v4, 1024-dim)"]
-  embed --> kw["keyword extraction + RELATED edges"]
-  kw --> cite["CITES linker (cross-encoder entailment)"]
-  kw --> comm["Leiden communities + community summaries"]
-  embed --> search["hybrid search: BM25 + dense + RRF + rerank + LangGraph"]
-  cite --> search
-  comm --> search
-  search --> verify["deterministic citation verifier (zero-hallucination gate)"]
-  verify --> api["FastAPI + Alpine.js SPA (upload / HITL / interactive)"]
-  search --> evalh["eval harness: NDCG/Recall/faithfulness + bootstrap CIs"]
-```
+The figure above is the canonical reference for the pipeline. Six stages
+(Ingest, Preprocessing, Dual Extraction + Fusion, Span-level HITL,
+Translation + KG, Search + Verification), with observability and
+evaluation harnesses on the right.
 
 ### Stack
 
@@ -40,9 +29,9 @@ flowchart TD
 |---|---|
 | Language / runtime | Python 3.12 + [uv](https://docs.astral.sh/uv/) |
 | Graph store | Neo4j 5.18 (APOC + GDS via plugins) |
-| OCR | PaddleOCR + DeepSeek-OCR + Qwen-VL (3-engine fusion) |
+| OCR | PaddleOCR + DeepSeek-OCR + Qwen-VL (three-engine fusion) |
 | Layout | PP-StructureV3 |
-| LLMs | Silra (OpenAI-compatible API) — `deepseek-chat`, `text-embedding-v4` |
+| LLMs | Silra (OpenAI-compatible) — `deepseek-chat`, `text-embedding-v4` |
 | Re-ranker | BAAI `bge-reranker-v2-gemma` |
 | Object store | MinIO (S3-compatible) |
 | Auth / metadata | PostgreSQL 16 |
@@ -65,77 +54,70 @@ flowchart TD
 git clone https://github.com/<your-org>/ancient-china.git
 cd ancient-china
 cp .env.example .env
-# edit .env — set LLM_API_KEY at minimum
+# edit .env — at minimum set LLM_API_KEY, NEO4J_PASSWORD,
+# POSTGRES_PASSWORD, MINIO_ROOT_PASSWORD, REDIS_PASSWORD
 ```
 
 ### 3. Bring up infrastructure
 ```bash
 docker compose up -d neo4j redis minio postgres
 ```
-- Neo4j browser → http://localhost:7474 (`neo4j` / `AncientChina`)
+- Neo4j browser → http://localhost:7474 (user `neo4j`, password from `.env`)
 - MinIO console → http://localhost:9001
 
-### 4. Install Python deps + register the kernel
+All infra ports bind to `127.0.0.1` only.
+
+### 4. Install Python deps
 ```bash
 uv sync
-uv run python -m ipykernel install --user --name ancient-china \
-  --display-name "Ancient China (uv)"
 ```
 
 ### 5. Drop sources into `raw/`
-The repo ships **without** corpus PDFs (they are not redistributable). Place your own primary and secondary sources under `raw/primary/` and `raw/secondary/` — the readers will tier them via `scripts/run_index_pipeline.py`.
+The repo ships **without** corpus PDFs (they are not redistributable).
+Place primary and secondary sources under `raw/primary/` and
+`raw/secondary/`; the readers will tier them via
+`scripts/run_index_pipeline.py`.
 
 ---
 
 ## Running the pipeline
 
-Each stage is **idempotent + resumable**. Re-running a script picks up where it left off. The two equivalent paths:
+Each stage is **idempotent + resumable**. Re-running a script picks up
+where it left off.
 
-### Notebooks (exploratory, per-stage artifacts under `notebooks/_artifacts/`)
-Run `notebooks/RUN_ALL.md` top-to-bottom:
-```
-00 → 00a → 01 → 01b → 01c → 02 → 03 → 03b → 03c
-→ 04 → 05 → 05b → 06 → 07 → 08 → 08b → 08c
-→ 09 → 09b → 10 → 11 → 11b → 12 → 13
-```
-
-### Scripts (production, log to `logs/`)
 ```bash
-# Stage 1 — ingest + tier
+# Stage 1 — ingest + tier + editorial-layer classification
 uv run python scripts/run_index_pipeline.py
 
-# Stage 2 — OCR (3 engines, parallel)
+# Stage 2 — preprocess (deskew, dewarp, illumination, bleed, page-split, marginalia)
+uv run python scripts/run_preprocess.py
+
+# Stage 3 — OCR (three engines, run in parallel)
 uv run python scripts/run_paddle_ocr.py
 uv run python scripts/run_deepseek_ocr.py
 uv run python scripts/run_qwen_ocr.py
 
-# Stage 3 — fusion → layout
+# Stage 4 — char-level fusion → layout analysis (PP-StructureV3)
 uv run python scripts/run_fusion.py
 uv run python scripts/run_layout_analysis.py
 
-# Stage 4 — evaluator + classifier
+# Stage 5 — evaluator + problem classifier
 uv run python scripts/run_evaluator.py
 
-# Stage 5 — translation (canonical + vernacular)
-caffeinate -dimsu uv run python scripts/run_translation.py \
-  --batch-size 10 --workers 8 --log-file logs/translation.log
+# Stage 6 — translation (canonical + vernacular)
+uv run python scripts/run_translation.py --batch-size 10 --workers 8
 
-# Stage 6 — chunking + embeddings (Silra batch cap is 10)
+# Stage 7 — chunking + embeddings (Silra batch cap is 10)
 uv run python scripts/run_chunking.py
 uv run python scripts/run_embedding.py --batch-size 10
 
-# Stage 7 — keywords + RELATED edges
+# Stage 8 — keywords + RELATED edges
 uv run python scripts/run_keyword_extraction.py --workers 12
 uv run python scripts/run_keyword_relate.py
 
-# Stage 8 — CITES + Leiden communities
+# Stage 9 — CITES linker + Leiden communities + community summaries
 uv run python scripts/run_citation_linker.py
 uv run python scripts/run_communities.py
-```
-
-After any code change, refresh the knowledge graph:
-```bash
-uv run graphify update .
 ```
 
 ---
@@ -148,11 +130,47 @@ open http://localhost:8000                     # Alpine.js SPA
 ```
 
 The SPA exposes three panels:
-- **Upload** — drop a PDF, the full pipeline runs in the background.
-- **HITL** — span-level correction queue (active learning sampling).
+- **Upload** — drop a PDF; the full pipeline runs in the background.
+- **HITL** — span-level correction queue with active-learning sampling.
 - **Ask / Notes / History** — interactive retrieval with inline citation chips.
 
-Every answer is **verified deterministically** against the cited chunk's `pageNumber` and offsets before it ever reaches the user (see `apps/backend/retrieval/verifier.py`).
+### How verification works
+
+Every retrieved chunk passes through the deterministic verifier in
+`apps/backend/agents/verifier.py` before it can be returned by
+`/search`. The verifier runs the candidate cited *span* and the chunk's
+`textCanonical` through the 7-step normalization pipeline (NFC →
+whitespace → T-S → 異體字 → 避諱 → optional 通假字 → mojimoji), then
+checks substring containment. Outcomes:
+
+- **`ok`** — span found in the canonical source text. Result is shown
+  with the appropriate evidence-strength badge
+  (`primary_source` / `primary_疏議` / `editorial_commentary` /
+  `scholarly_interpretation`).
+- **`translation_match`** — span only found in the LLM-generated
+  vernacular translation. Result is shown but **not** marked
+  `verified`; the badge is `translation_match`.
+- **`not_applicable`** — the query contained no verbatim classical-
+  Chinese span of length ≥ 4 to verify against (typical for natural-
+  language questions). Result is shown unflagged.
+- **`insufficient_evidence`** — the span is missing, the chunk is
+  missing, or the span is too short to be diagnostic. The result is
+  **dropped from the ribbon** and counted in `gated_count`. A
+  `(:VERIFIER_FAILURE)` node is written to Neo4j for audit.
+
+The verifier's guarantee is: *"the span is present in the source modulo
+philological normalization"*. It is **not** a claim of semantic support
+— for that, the LLM evidence-scorer in
+`apps/backend/pipeline/evidence_scorer.py` runs first as a re-ranker.
+
+### BM25 freshness
+
+The BM25 index is built in memory from the whole CHUNK corpus when the
+server starts and held on `app.state.bm25_corpus`. **New uploads are not
+reflected in BM25 results until the server restarts.** Dense (vector)
+retrieval picks up new chunks immediately. The `/search` response
+includes `"bm25_ready": bool` so clients can show a warning when only
+dense retrieval is available.
 
 ---
 
@@ -163,7 +181,9 @@ uv run python -m eval.harness --bench data/bench --out eval_out
 cat eval_out/summary.txt
 ```
 
-Produces `eval_out/metrics.json` with NDCG@10, Recall@k, faithfulness, and **bootstrap 95% CIs** (10k resamples). Bench layout under `data/bench/`:
+Produces `eval_out/metrics.json` with NDCG@10, Recall@k, faithfulness,
+and **bootstrap 95% CIs** (10k resamples). Bench layout under
+`data/bench/`:
 - `queries.jsonl` — search queries with relevant chunk ids
 - `faithfulness.jsonl` — faithful spans for the verifier
 - `linking_gold.jsonl` — secondary → primary CITES gold pairs
@@ -180,24 +200,29 @@ uv run pytest apps/backend/tests -q
 ```
 apps/
   backend/         FastAPI + pipeline modules
-    agents/        translation, evaluator, classifier
+    agents/        intent, HyDE, rerank, output (two-ribbon + verifier gate),
+                   verifier (deterministic citation gate),
+                   relevance_scorer (LLM evidence scoring)
     api/           HTTP routes + SPA mount
-    graph/         Neo4j queries + schema migrations
-    kb/            chunking, keywords, communities, citations
-    lang/          language detection + normalization
-    llm/           Silra client wrappers + retries
-    normalize/     classical-Chinese normalizer
-    ocr/           paddle / deepseek / qwen-vl + fusion
-    pipeline/      orchestrator + layout
-    preprocess/    6-step image preprocessing
-    readers/       PDF + structured doc readers
-    retrieval/     hybrid search + verifier + LangGraph
+    feedback/      active learning + correction writer
+    graph/         Neo4j client + schema migrations
+    kb/            dictionary, norms, language rules
+    lang/          language detection + tokenization
+    llm/           Silra client wrapper (retries + Retry-After)
+    normalize/     classical-Chinese normalization (7-step pipeline)
+    ocr/           paddle / deepseek / qwen-vl + char-level fusion
+    pipeline/      ingest → preprocess → fusion → layout → translate →
+                   chunk → embed → keywords → citations → communities;
+                   evidence_scorer (LLM re-rank)
+    preprocess/    six-step image chain (deskew / dewarp / illumination /
+                   bleed / page-split / marginalia)
+    readers/       PDF + EPUB + image + packed-markdown readers
+    retrieval/     bm25 / dense / fuse (RRF) / community
     storage/       MinIO + Neo4j drivers
     tests/         pytest suite
   frontend/        Alpine.js SPA (single index.html + static/)
-notebooks/         00 → 13 exploratory pipeline (artifacts under _artifacts/)
 scripts/           production runners for each stage
-eval/              AncientChinaSearch-Bench harness
+eval/              evaluation harness with bootstrap CIs
 data/
   bench/           eval gold data
   seeds/           normalization seeds + dictionaries
@@ -207,16 +232,8 @@ docker-compose.yml Neo4j / Redis / MinIO / Postgres / app
 
 ---
 
-## Conventions
-See [AGENTS.md](AGENTS.md) for the full set of project rules. Highlights:
-- `uv run python <file>` — never activate the venv manually
-- Node labels `UPPER_SNAKE_CASE`, property keys `camelCase`, parametrized Cypher only
-- Notebooks pin the `ancient-china` ipykernel and persist outputs under `notebooks/_artifacts/<stage>/`
-- ADRs land in `AGENTS.md` §11 (Dynamic Rules Log)
-
----
-
 ## License
 
-MIT — see [LICENSE](LICENSE).
-The source corpus under `raw/` is **excluded** from this repository and is subject to the publishers' own copyrights; only the pipeline code is MIT.
+MIT — see [LICENSE](LICENSE). The source corpus under `raw/` is
+**excluded** from this repository and is subject to the publishers' own
+copyrights; only the pipeline code is MIT.

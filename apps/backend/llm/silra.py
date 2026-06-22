@@ -13,7 +13,7 @@ Environment variables consumed (all required, loaded by the caller via
 - ``CHAT_LLM_MODEL`` — chat / reasoning model (default ``deepseek-chat``).
 - ``OCR_LLM_MODEL`` — OCR-capable VLM (default ``deepseek-ocr``).
 - ``EMBED_LLM_MODEL`` — embedding model (default ``text-embedding-v4``).
-- ``EMBEDDING_DIMS`` — expected embedding dimension (default ``2048``).
+- ``EMBEDDING_DIMS`` — expected embedding dimension (default ``1024``).
 """
 
 from __future__ import annotations
@@ -206,9 +206,8 @@ def embed(
 def ping(*, client: OpenAI | None = None) -> dict[str, Any]:
     """Lightweight health probe for Silra: 1-token chat + 1-text embed.
 
-    Both calls are cheap (a few tokens each). Used by
-    ``notebooks/00_setup_smoke_test.ipynb`` to confirm the API is reachable
-    and that the configured chat + embedding models exist.
+    Both calls are cheap (a few tokens each). Confirms the API is
+    reachable and that the configured chat + embedding models exist.
 
     Returns:
         A dict with shape::
@@ -230,7 +229,7 @@ def ping(*, client: OpenAI | None = None) -> dict[str, Any]:
     chat_model = os.getenv("CHAT_LLM_MODEL", "deepseek-chat")
     embed_model = os.getenv("EMBED_LLM_MODEL", "text-embedding-v4")
     ocr_model = os.getenv("OCR_LLM_MODEL", "deepseek-ocr")
-    embedding_dims_expected = int(os.getenv("EMBEDDING_DIMS", "2048"))
+    embedding_dims_expected = int(os.getenv("EMBEDDING_DIMS", "1024"))
 
     chat_sample: str = ""
     embedding_dims_observed: int = 0

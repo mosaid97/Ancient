@@ -14,11 +14,28 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 from apps.backend.agents.verifier import (
+    MIN_SPAN_CHARS,
     VerifierFailureMode,
     VerifierResult,
     _evidence_strength,
+    extract_quotable_span,
     verify_cite,
 )
+
+
+def test_extract_quotable_span_picks_longest_han_run():
+    assert extract_quotable_span("唐代律法") == "唐代律法"
+    # Mixed natural-language query — pick the longest Han run.
+    assert extract_quotable_span("What does 十惡尤切 mean in 唐律?") == "十惡尤切"
+
+
+def test_extract_quotable_span_returns_none_for_short_runs():
+    # Below MIN_SPAN_CHARS: no quotable span.
+    assert extract_quotable_span("唐律") is None
+    # No Han chars at all.
+    assert extract_quotable_span("what is the law?") is None
+    # Empty input.
+    assert extract_quotable_span("") is None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -90,7 +107,9 @@ def test_whitespace_only_span_no_db_call():
 def test_chunk_not_found():
     """Missing chunk → insufficient_evidence + VERIFIER_FAILURE node written."""
     driver = _make_driver(None)
-    result = verify_cite(driver, "missing_chunk", "唐律")
+    # Use a ≥ MIN_SPAN_CHARS span so we exercise the chunk-not-found path
+    # rather than the short-span guard.
+    result = verify_cite(driver, "missing_chunk", "唐律疏議")
     assert result.outcome == "insufficient_evidence"
     assert result.failure_mode == VerifierFailureMode.CHUNK_NOT_FOUND
     # VERIFIER_FAILURE write should be attempted (second session.run call)
@@ -110,9 +129,20 @@ def test_chunk_with_no_text():
         "detected_era": None,
     }
     driver = _make_driver(row)
-    result = verify_cite(driver, "c1", "唐律")
+    result = verify_cite(driver, "c1", "唐律疏議")
     assert result.outcome == "insufficient_evidence"
     assert result.failure_mode == VerifierFailureMode.NO_TEXT
+
+
+def test_short_span_rejected():
+    """Spans shorter than MIN_SPAN_CHARS (4) are rejected as too short
+    — trivial matches like 之/曰 do not earn the verified badge."""
+    driver = _make_driver(None)
+    result = verify_cite(driver, "any_chunk", "之曰")
+    # Must not reach the chunk-fetch session call (guard runs first).
+    driver.session.assert_called()  # only the failure-node write
+    assert result.outcome == "insufficient_evidence"
+    assert result.failure_mode == VerifierFailureMode.SPAN_TOO_SHORT
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -140,8 +170,9 @@ def test_faithful_span_matches_canonical():
     assert result.tier == "primary"
 
 
-def test_faithful_span_matches_vernacular():
-    """Span in textVernacular (vernacular modern Chinese) → outcome='ok'."""
+def test_vernacular_match_is_translation_only_not_verified():
+    """Span only present in textVernacular (LLM translation) must NOT
+    earn the verified badge — outcome='translation_match', ok=False."""
     row = {
         "chunk_id": "c2",
         "text_canonical": "十惡尤切",
@@ -154,8 +185,11 @@ def test_faithful_span_matches_vernacular():
     }
     driver = _make_driver(row)
     result = verify_cite(driver, "c2", "最严重的罪行")
-    assert result.ok
+    assert result.outcome == "translation_match"
+    assert result.translation_match is True
+    assert result.ok is False
     assert result.matched_in == "vernacular"
+    assert result.evidence_strength == "translation_match"
 
 
 def test_span_only_in_raw_fallback():

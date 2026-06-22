@@ -12,8 +12,8 @@ Conventions per AGENTS.md §4:
 - ``camelCase`` property keys.
 - All queries parameterized.
 
-Embedding dimension is read from ``EMBEDDING_DIMS`` (default 2048, matching
-Silra's ``text-embedding-v4``). The bake-off in Phase 7 may swap this.
+Embedding dimension is read from ``EMBEDDING_DIMS`` (default 1024, matching
+Silra's ``text-embedding-v4``).
 """
 
 from __future__ import annotations
@@ -156,7 +156,7 @@ def init_schema(
     Args:
         driver: An open Neo4j driver.
         embedding_dims: Vector dimension for every text/image vector index.
-            Defaults to ``EMBEDDING_DIMS`` env var (fallback 2048).
+            Defaults to ``EMBEDDING_DIMS`` env var (fallback 1024).
         similarity: ``"cosine"`` (default) or ``"euclidean"``. Cosine is
             consistent with Silra ``text-embedding-v4`` per ADR-08 (pending).
 

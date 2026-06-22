@@ -1,7 +1,10 @@
 """C1: Dense (vector) retrieval over chunk_embedding_classical (plan §0.6 C1).
 
-Thin adapter over the existing pipeline/search.py vector_search() so the
-hybrid fuser has a uniform interface for all retrieval legs.
+Thin adapter so the hybrid fuser has a uniform interface for all retrieval
+legs. Embedding goes through :func:`apps.backend.llm.silra.embed` so the
+shared retry/backoff (incl. Retry-After honouring) is used everywhere —
+per AGENTS.md §5, all code must import :func:`get_silra_client` rather
+than building its own ``openai.OpenAI`` instance.
 """
 from __future__ import annotations
 
@@ -9,12 +12,12 @@ import logging
 import os
 
 from neo4j import Driver
-from openai import OpenAI
+
+from apps.backend.llm.silra import embed as silra_embed
 
 log = logging.getLogger(__name__)
 
 _DEFAULT_TOP_K = 50
-_EMBED_BATCH = 10
 
 # ── Cypher ────────────────────────────────────────────────────────────────────
 
@@ -41,21 +44,20 @@ ORDER BY score DESC
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _embed_query(text: str, *, model: str) -> list[float] | None:
-    client = OpenAI(
-        api_key=os.getenv("LLM_API_KEY", ""),
-        base_url=os.getenv("LLM_BASE_URL", "https://api.silra.cn/v1/"),
-    )
-    for attempt in range(3):
-        try:
-            resp = client.embeddings.create(input=[text], model=model)
-            return resp.data[0].embedding
-        except Exception as exc:
-            import time
-            if attempt == 2:
-                log.warning("Query embed failed: %s", exc)
-                return None
-            time.sleep(2 ** attempt)
-    return None
+    """Embed a single query string via the shared Silra client.
+
+    Returns None on failure (logged as a warning) so the caller can decide
+    whether to fall back to keyword-only search instead of crashing.
+    """
+    try:
+        vectors = silra_embed(text, model=model)
+    except Exception as exc:
+        log.warning("dense.embed failed for query (model=%s): %s", model, exc)
+        return None
+    if not vectors:
+        log.warning("dense.embed returned no vectors for query")
+        return None
+    return vectors[0]
 
 
 # ── Public API ────────────────────────────────────────────────────────────────

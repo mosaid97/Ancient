@@ -1,30 +1,20 @@
-"""LLM-based relevance + evidence scorer (formerly called 'verifier').
+"""Agent-layer alias for the LLM relevance + evidence scorer.
 
-This is NOT the zero-hallucination citation gate — that lives in
-:mod:`apps.backend.agents.verifier`.  This module assigns a 0–10 relevance
-and 0–10 evidence score to each search result via deepseek-chat, useful for
-re-ranking before the deterministic gate runs.
+This is **not** the deterministic citation gate — that lives in
+:mod:`apps.backend.agents.verifier`. The scorer assigns each candidate
+chunk a relevance + evidence score (0–10) via an LLM and is used to
+re-rank candidates *before* the deterministic gate runs.
 
-The module re-exports the full public API from pipeline.verifier so that
-existing callers (scripts, notebooks) can migrate to the new name without a
-hard cut-over.
-
-Preferred import going forward::
-
-    from apps.backend.agents.relevance_scorer import verify_chunks, VerificationItem
-
-Old import (still works, but deprecated)::
-
-    from apps.backend.pipeline.verifier import verify_chunks, VerificationItem
+The implementation lives in :mod:`apps.backend.pipeline.evidence_scorer`;
+this module just re-exports under the agent-layer name so callers can
+import from either layer.
 """
 from __future__ import annotations
 
-# Re-export everything from the original module so callers can migrate at
-# their own pace.
-from apps.backend.pipeline.verifier import (  # noqa: F401
-    VerificationItem,
-    VerifierRunReport,
-    verify_chunks,
+from apps.backend.pipeline.evidence_scorer import (  # noqa: F401
+    EvidenceItem,
+    EvidenceRunReport,
+    score_evidence,
 )
 
-__all__ = ["VerificationItem", "VerifierRunReport", "verify_chunks"]
+__all__ = ["EvidenceItem", "EvidenceRunReport", "score_evidence"]

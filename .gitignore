@@ -1,4 +1,4 @@
-# Python-generated files
+# Python build artifacts
 __pycache__/
 *.py[oc]
 build/
@@ -9,13 +9,13 @@ wheels/
 # Virtual environments
 .venv
 
-# Environment variables
+# Environment variables (use .env.example as a template)
 .env
 
-# Raw corpus (large binary files — not redistributable)
+# Raw corpus (large + not redistributable)
 raw/
 
-# Data blobs (keep data/seeds/ and data/bench/ — exclude large binary dumps)
+# Data blobs (keep data/seeds/ and data/bench/; exclude large binary dumps)
 data/blobs/
 data/paddle_corpus/
 data/*.db
@@ -23,15 +23,18 @@ data/*.db
 # Evaluation outputs (generated at runtime)
 eval_out/
 
-# Notebook artifacts (generated outputs, not source)
-notebooks/_artifacts/
-
 # Logs (generated at runtime — keep the placeholder, ignore everything else)
 logs/*
 !logs/.gitkeep
 
-# Graphify knowledge-graph outputs (generated, not source)
-graphify-out/
+# Notebooks (exploratory artifacts — not part of the shipped pipeline)
+notebooks/
+
+# Internal contributor documentation (not part of the public release)
+AGENTS.md
+CLAUDE.md
+docs/superpowers/
+docs/feature-layout-analysis-*.md
 
 # macOS
 .DS_Store
@@ -47,5 +50,12 @@ minio_data/
 .claude/
 .mcp.json
 .idea/
+.pytest_cache/
 *.swp
 *.swo
+
+# Graphify knowledge-graph outputs (generated, not source)
+graphify-out/
+
+# Staging area for in-progress files
+staging/

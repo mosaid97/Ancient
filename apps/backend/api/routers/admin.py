@@ -151,8 +151,8 @@ def _translation_job() -> dict[str, Any]:
             r = json.loads(report_path.read_text())
             ok = r.get("total_ok", 0)
             elapsed = r.get("elapsed_seconds", 0.0)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning("admin report parse failed for %s: %s", report_path, exc)
 
     # Try to get total from Neo4j would be slow here; use known corpus size
     # (recorded in AGENTS.md: 25,999 primary + 14,240 secondary = 40,239)
@@ -165,8 +165,12 @@ def _translation_job() -> dict[str, Any]:
             ["pgrep", "-f", "run_translation.py"], text=True
         ).strip()
         status = "running" if out else ("complete" if ok >= total else "idle")
-    except Exception:
-        status = "idle" if ok < total else "complete"
+    except subprocess.CalledProcessError:
+        # pgrep returns non-zero when no process matches — that is "not running".
+        status = "complete" if ok >= total else "idle"
+    except FileNotFoundError as exc:
+        log.warning("pgrep not available; falling back to file-based status: %s", exc)
+        status = "complete" if ok >= total else "idle"
 
     pct = round(ok / total * 100, 2) if total else 0
     eta_s = None
@@ -197,8 +201,8 @@ def _embedding_job() -> dict[str, Any]:
             ok = r.get("total_ok", 0)
             total = r.get("total_chunks", 0) or 40239
             elapsed = r.get("elapsed_seconds", 0.0)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning("admin report parse failed for %s: %s", report_path, exc)
     total = total or 40239
     status = "complete" if ok >= total and total > 0 else ("running" if ok > 0 else "pending")
     return {
@@ -223,8 +227,8 @@ def _keyword_job() -> dict[str, Any]:
             ok = r.get("total_ok", 0)
             total = r.get("total_chunks", ok) or 40239
             elapsed = r.get("elapsed_seconds", 0.0)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning("admin report parse failed for %s: %s", report_path, exc)
     status = "complete" if ok > 0 and ok >= total else ("running" if ok > 0 else "pending")
     return {
         "name": "關鍵詞提取 Keywords",
@@ -245,8 +249,8 @@ def _community_job() -> dict[str, Any]:
         try:
             r = json.loads(report_path.read_text())
             ok = r.get("total_ok", 0)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning("admin report parse failed for %s: %s", report_path, exc)
     status = "complete" if ok > 0 else "pending"
     return {
         "name": "社區檢測 Communities",
@@ -268,8 +272,8 @@ def _citation_job() -> dict[str, Any]:
             r = json.loads(report_path.read_text())
             ok = r.get("total_ok", 0)
             total = r.get("total_spans", 0)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning("admin report parse failed for %s: %s", report_path, exc)
     status = "complete" if ok > 0 else "pending"
     return {
         "name": "引文連結 Citation Linking",
@@ -297,7 +301,8 @@ async def pipeline_status(driver: Driver = Depends(get_driver)) -> dict[str, Any
                 count(*) AS total
         """)
         live = chunk_rows[0] if chunk_rows else {}
-    except Exception:
+    except Exception as exc:
+        log.warning("pipeline_status: live chunk counts unavailable: %s", exc)
         live = {}
 
     total = live.get("total") or 40239
@@ -310,7 +315,10 @@ async def pipeline_status(driver: Driver = Depends(get_driver)) -> dict[str, Any
         import subprocess
         out = subprocess.check_output(["pgrep", "-f", "run_translation.py"], text=True).strip()
         trans_status = "running" if out else ("complete" if trans_ok >= total else "idle")
-    except Exception:
+    except subprocess.CalledProcessError:
+        trans_status = "complete" if trans_ok >= total else "idle"
+    except FileNotFoundError as exc:
+        log.warning("pgrep not available; falling back to count-based status: %s", exc)
         trans_status = "complete" if trans_ok >= total else "idle"
 
     # Read elapsed from last report
@@ -319,8 +327,8 @@ async def pipeline_status(driver: Driver = Depends(get_driver)) -> dict[str, Any
     if trans_report.exists():
         try:
             trans_elapsed = json.loads(trans_report.read_text()).get("elapsed_seconds", 0.0)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning("admin report parse failed for %s: %s", report_path, exc)
 
     trans_eta = None
     if trans_ok > 5 and trans_elapsed > 0 and trans_ok < total:
@@ -333,7 +341,8 @@ async def pipeline_status(driver: Driver = Depends(get_driver)) -> dict[str, Any
         comm_ok = comm_row[0]["n"] if comm_row else 0
         cite_row = _run(driver, "MATCH ()-[r:CITES]->() RETURN count(r) AS n")
         cite_ok = cite_row[0]["n"] if cite_row else 0
-    except Exception:
+    except Exception as exc:
+        log.warning("pipeline_status: COMMUNITY/CITES counts unavailable: %s", exc)
         comm_ok = cite_ok = 0
 
     embed_status = "complete" if embedded >= total else ("running" if embedded > 0 else "pending")
