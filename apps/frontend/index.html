@@ -468,6 +468,30 @@
           </button>
         </div>
 
+        <!-- Degraded-mode banner: shown when the deterministic verifier
+             could not confirm any candidate against the cited span. We
+             still show the results (better than an empty page) but the
+             user needs to know none of them are source-verified. -->
+        <div x-show="searchDegraded && searchResults.length > 0"
+             class="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+          <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          <div class="text-sm text-amber-900 flex-1">
+            <div class="font-medium">None of these results were source-verified.</div>
+            <div class="text-amber-800 mt-0.5">
+              The phrase
+              <code class="bg-amber-100 px-1.5 py-0.5 rounded font-mono text-xs" x-text="searchVerifySpan"></code>
+              was not found verbatim in any of the
+              <span x-text="searchGatedCount"></span>
+              candidate passage(s). The results below are the closest
+              semantic matches — interpret with care, and follow the
+              citation back to the source page before quoting.
+            </div>
+          </div>
+        </div>
+
         <!-- Empty state (no query yet) -->
         <div x-show="!searchLoading && searchResults.length === 0 && !searchError && !query"
              class="flex flex-col items-center justify-center h-full min-h-64 text-center py-16">
@@ -1832,6 +1856,9 @@
         searchIntent: null,
         searchBm25Ready: false,
         searchDuration: null,
+        searchDegraded: false,
+        searchVerifySpan: null,
+        searchGatedCount: 0,
         filters: { tier: 'both', lang: 'all', top_k: 10, expand_keywords: true },
         _expandedSet: [],
 
@@ -2346,6 +2373,9 @@
             this.searchIntent = data.intent || null;
             this.searchBm25Ready = data.bm25_ready || false;
             this.searchDuration = data.duration_ms || null;
+            this.searchDegraded = !!data.degraded;
+            this.searchVerifySpan = data.verify_span || null;
+            this.searchGatedCount = data.gated_count || 0;
             if (this.searchResults.length === 0) {
               this.searchError = null;
             }
