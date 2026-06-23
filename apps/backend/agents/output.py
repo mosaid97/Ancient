@@ -162,6 +162,11 @@ class SearchResponse:
     verify_span: str | None = None
     gated: bool = True
     gated_count: int = 0
+    # True when verifier-gating would have emptied both ribbons, so we
+    # fell back to showing unverified candidates with a warning. The UI
+    # should label every result in this response as "unverified — interpret
+    # with care" rather than dropping the user into an empty page.
+    degraded: bool = False
 
     @property
     def all_results(self) -> list[RibbonResult]:
@@ -178,6 +183,7 @@ class SearchResponse:
             "verifySpan": self.verify_span,
             "gated": self.gated,
             "gatedCount": self.gated_count,
+            "degraded": self.degraded,
         }
 
 
@@ -233,14 +239,22 @@ def build_response(
             query[:60],
         )
 
+    # First pass: collect every candidate (with verifier outcome) up to a
+    # cap of 2 × top_per_ribbon per tier. We need the unverified items in
+    # hand to provide a graceful fallback when gating would empty the
+    # response — empty pages are a worse outcome than unverified results
+    # accompanied by a clear warning.
+    collected_primary: list[RibbonResult] = []
+    collected_secondary: list[RibbonResult] = []
+    fetch_cap = top_per_ribbon * 2
+
     for result in reranked:
         if (
-            len(response.primary_ribbon) >= top_per_ribbon
-            and len(response.secondary_ribbon) >= top_per_ribbon
+            len(collected_primary) >= fetch_cap
+            and len(collected_secondary) >= fetch_cap
         ):
             break
 
-        # Fetch chunk text + full spine provenance in one round-trip
         with driver.session() as s:
             rows = s.run(_CHUNK_SPINE_QUERY, chunk_id=result.chunk_id).data()
         if not rows:
@@ -248,12 +262,11 @@ def build_response(
         row = rows[0]
         tier = row.get("tier")
 
-        if tier == "primary" and len(response.primary_ribbon) >= top_per_ribbon:
+        if tier == "primary" and len(collected_primary) >= fetch_cap:
             continue
-        if tier == "secondary" and len(response.secondary_ribbon) >= top_per_ribbon:
+        if tier == "secondary" and len(collected_secondary) >= fetch_cap:
             continue
 
-        # Verify when we have a quotable span; otherwise mark not_applicable.
         if span is None:
             verifier_result = _not_applicable_result(result.chunk_id)
         else:
@@ -263,14 +276,6 @@ def build_response(
                 span,
                 min_span_chars=min_span_chars,
             )
-
-        # Gate: drop chunks that explicitly failed source-presence check.
-        # 'translation_match' and 'not_applicable' are kept (they are not
-        # hallucinations — translation is a softer signal, not_applicable
-        # means the query had no verbatim span to check against).
-        if gate_unverified and verifier_result.outcome == "insufficient_evidence":
-            response.gated_count += 1
-            continue
 
         ribbon_item = RibbonResult(
             chunk_id=result.chunk_id,
@@ -295,15 +300,49 @@ def build_response(
         )
 
         if tier == "primary":
-            response.primary_ribbon.append(ribbon_item)
+            collected_primary.append(ribbon_item)
         else:
-            response.secondary_ribbon.append(ribbon_item)
+            collected_secondary.append(ribbon_item)
+
+    # Second pass: apply gating. An item passes the gate when its outcome
+    # is anything *other than* 'insufficient_evidence' — i.e. verified,
+    # translation match, or not_applicable.
+    def _passes_gate(item: RibbonResult) -> bool:
+        return item.verifier.outcome != "insufficient_evidence"
+
+    if gate_unverified:
+        gated_primary = [r for r in collected_primary if _passes_gate(r)]
+        gated_secondary = [r for r in collected_secondary if _passes_gate(r)]
+        dropped = (len(collected_primary) - len(gated_primary)) + \
+                  (len(collected_secondary) - len(gated_secondary))
+
+        # Fallback: if gating would empty both ribbons AND we had
+        # candidates, return the unverified set with `degraded=True` so
+        # the UI can warn the user instead of showing a blank page.
+        if (not gated_primary and not gated_secondary
+                and (collected_primary or collected_secondary)):
+            log.info(
+                "build_response: gate would empty ribbons for span=%r "
+                "(%d candidates failed verification) — degrading to unverified",
+                span, dropped,
+            )
+            response.primary_ribbon = collected_primary[:top_per_ribbon]
+            response.secondary_ribbon = collected_secondary[:top_per_ribbon]
+            response.gated = False
+            response.degraded = True
+            response.gated_count = dropped
+        else:
+            response.primary_ribbon = gated_primary[:top_per_ribbon]
+            response.secondary_ribbon = gated_secondary[:top_per_ribbon]
+            response.gated_count = dropped
+    else:
+        response.primary_ribbon = collected_primary[:top_per_ribbon]
+        response.secondary_ribbon = collected_secondary[:top_per_ribbon]
 
     response.duration_ms = (time.time() - t0) * 1000
     if response.gated_count:
         log.info(
-            "build_response: gated %d unverified results (span=%r)",
-            response.gated_count,
-            span,
+            "build_response: gated %d unverified results (span=%r, degraded=%s)",
+            response.gated_count, span, response.degraded,
         )
     return response

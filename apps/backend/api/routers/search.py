@@ -186,6 +186,7 @@ async def search_endpoint(
                 "verify_span": resp.verify_span,
                 "gated": resp.gated,
                 "gated_count": resp.gated_count,
+                "degraded": resp.degraded,
             }
 
     # ── Dense-only fallback ───────────────────────────────────────────────────
