@@ -48,24 +48,32 @@ _RETRYABLE_EXCEPTIONS: tuple[type[BaseException], ...] = (
 )
 
 
-def get_silra_client(timeout: float = 60.0) -> OpenAI:
+def get_silra_client(
+    timeout: float = 60.0,
+    *,
+    api_key: str | None = None,
+) -> OpenAI:
     """Build an OpenAI-SDK client pointed at Silra.
 
     Args:
         timeout: Per-request timeout in seconds.
+        api_key: Override the API key (used by per-user request handlers
+            that decrypt the key from the vault). When None, falls back
+            to the ``LLM_API_KEY`` env var so offline pipeline scripts
+            (translation, embedding, OCR) keep working.
 
     Returns:
         A configured :class:`openai.OpenAI` client.
 
     Raises:
-        RuntimeError: If ``LLM_API_KEY`` or ``LLM_BASE_URL`` is missing.
+        RuntimeError: If no API key is available.
     """
-    api_key = os.getenv("LLM_API_KEY")
+    api_key = api_key or os.getenv("LLM_API_KEY")
     base_url = os.getenv("LLM_BASE_URL")
     if not api_key:
         raise RuntimeError(
-            "LLM_API_KEY is not set; load .env via python-dotenv before "
-            "calling get_silra_client()."
+            "No Silra API key available. Either pass api_key=, or set "
+            "LLM_API_KEY in .env for offline scripts."
         )
     if not base_url:
         raise RuntimeError("LLM_BASE_URL is not set (e.g. https://api.silra.cn/v1/).")

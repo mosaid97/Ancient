@@ -313,6 +313,17 @@
         </svg>
         <span class="nav-label text-sm font-medium cjk" x-text="t('nav.pipeline')"></span>
       </button>
+
+      <!-- Settings / API Keys -->
+      <button x-show="currentUser" @click="navigateTo('settings')"
+              class="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-colors duration-150"
+              :class="page === 'settings' ? 'bg-teal-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 7a2 2 0 11-4 0 2 2 0 014 0zM9 19h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0zM12 7v6m0 4h.01"/>
+        </svg>
+        <span class="nav-label text-sm font-medium cjk">Settings</span>
+      </button>
     </div>
 
     <!-- Locale switcher + version -->
@@ -320,9 +331,11 @@
       <!-- User / Login -->
       <div class="nav-label mb-1 px-1">
         <div x-show="currentUser" class="flex items-center gap-2">
-          <div class="w-6 h-6 rounded-full bg-teal-700 flex items-center justify-center text-white text-xs font-bold" x-text="currentUser ? currentUser.email[0].toUpperCase() : ''"></div>
-          <span class="text-slate-300 text-xs truncate flex-1" x-text="currentUser ? currentUser.email : ''"></span>
-          <button @click="logout()" class="text-slate-500 hover:text-red-400 text-xs">✕</button>
+          <div class="w-6 h-6 rounded-full bg-teal-700 flex items-center justify-center text-white text-xs font-bold"
+               x-text="currentUser ? currentUser.username[0].toUpperCase() : ''"></div>
+          <span class="text-slate-300 text-xs truncate flex-1"
+                x-text="currentUser ? currentUser.username : ''"></span>
+          <button @click="logout()" class="text-slate-500 hover:text-red-400 text-xs" title="Sign out">✕</button>
         </div>
         <button x-show="!currentUser" @click="showLoginModal = true"
                 class="w-full text-xs text-slate-500 hover:text-teal-400 text-left transition-colors">
@@ -906,6 +919,107 @@
         <div x-show="selectedReviewItem && !pageDetail"
              class="flex items-center justify-center h-full">
           <div class="spinner"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE: SETTINGS / API KEYS ===== -->
+    <div x-show="page === 'settings'" class="flex flex-col h-full page-content overflow-y-auto scrollable">
+      <div class="max-w-3xl mx-auto w-full px-6 py-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h1 class="text-slate-800 text-xl font-semibold">API Keys</h1>
+            <p class="text-slate-400 text-sm mt-0.5">
+              Stored encrypted with a key derived from your password — only you can read them.
+            </p>
+          </div>
+          <button @click="openKeyEditor(null)"
+                  class="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add key
+          </button>
+        </div>
+
+        <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 flex items-start gap-3">
+          <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <div class="text-sm text-amber-900">
+            <span class="font-medium">Zero-knowledge:</span>
+            we never store the key that encrypts these — it lives in memory
+            only while you're logged in. If you forget your password, the
+            stored keys cannot be recovered and you'll need to re-enter
+            them from the original provider.
+          </div>
+        </div>
+
+        <!-- Loading -->
+        <div x-show="apiKeysLoading" class="flex items-center justify-center py-16">
+          <div class="spinner"></div>
+        </div>
+
+        <!-- Empty -->
+        <div x-show="!apiKeysLoading && apiKeys.length === 0"
+             class="text-center py-16 border border-dashed border-slate-200 rounded-xl">
+          <svg class="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M15 7a2 2 0 11-4 0 2 2 0 014 0zM12 14a2 2 0 100-4 2 2 0 000 4zm0 0v6"/>
+          </svg>
+          <h3 class="text-slate-600 font-medium">No API keys saved yet</h3>
+          <p class="text-slate-400 text-sm mt-1 max-w-sm mx-auto">
+            Add your Silra (or OpenAI-compatible) key to enable search,
+            translation, and OCR pipelines from this account.
+          </p>
+          <button @click="openKeyEditor(null)"
+                  class="mt-4 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium">
+            Add your first key
+          </button>
+        </div>
+
+        <!-- Keys list -->
+        <div x-show="!apiKeysLoading && apiKeys.length > 0"
+             class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+          <template x-for="key in apiKeys" :key="key.id">
+            <div class="px-5 py-4 flex items-start gap-4">
+              <div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M15 7a2 2 0 11-4 0 2 2 0 014 0zM12 14a2 2 0 100-4 2 2 0 000 4zm0 0v6"/>
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium text-slate-800" x-text="key.label"></span>
+                  <span class="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded uppercase tracking-wide" x-text="key.provider"></span>
+                </div>
+                <div class="text-xs text-slate-400 mt-1 font-mono">
+                  ••••<span x-text="key.last4"></span>
+                  <span class="text-slate-300 mx-1">·</span>
+                  Added <span x-text="key.created_at ? key.created_at.slice(0,10) : '—'"></span>
+                  <template x-if="key.last_used_at">
+                    <span><span class="text-slate-300 mx-1">·</span>Last used <span x-text="key.last_used_at.slice(0,10)"></span></span>
+                  </template>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button @click="revealApiKey(key)"
+                        class="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-100" title="Reveal once">
+                  Reveal
+                </button>
+                <button @click="openKeyEditor(key)"
+                        class="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-100" title="Edit / rotate">
+                  Edit
+                </button>
+                <button @click="confirmDeleteKey(key)"
+                        class="text-xs text-slate-500 hover:text-rose-600 px-2 py-1 rounded hover:bg-rose-50" title="Delete">
+                  Delete
+                </button>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -1673,23 +1787,28 @@
       <div class="px-6 py-5 space-y-4">
         <div x-show="authError" class="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2" x-text="authError"></div>
         <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Email</label>
-          <input x-model="loginEmail" type="email" placeholder="you@example.com"
+          <label class="block text-xs font-medium text-slate-600 mb-1">Username</label>
+          <input x-model="loginUsername" type="text" placeholder="admin" autocomplete="username"
                  @keydown.enter="$refs.loginPwd.focus()"
                  class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500" />
         </div>
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Password</label>
-          <input x-ref="loginPwd" x-model="loginPassword" type="password" placeholder="••••••••"
+          <input x-ref="loginPwd" x-model="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password"
                  @keydown.enter="login()"
                  class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500" />
         </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Your password also unlocks the API-key vault. We never store the
+          decryption key — if you forget your password, your saved API keys
+          cannot be recovered.
+        </p>
       </div>
       <div class="px-6 pb-6 flex gap-3 justify-end">
         <button @click="showLoginModal = false; authError = null"
                 class="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 text-sm hover:bg-slate-50">Cancel</button>
         <button @click="login()"
-                :disabled="authLoading || !loginEmail || !loginPassword"
+                :disabled="authLoading || !loginUsername || !loginPassword"
                 class="px-5 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
           <span x-show="authLoading" class="spinner" style="width:14px;height:14px;border-width:2px;"></span>
           Sign In
@@ -1757,6 +1876,130 @@
         <button @click="submitCorrection()"
                 class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium cjk transition-colors"
                 x-text="t('ocrhitl.submitCorrection')">
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== API KEY EDITOR ===== -->
+  <div x-show="showKeyEditor"
+       x-transition.opacity
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="background: rgba(0,0,0,0.5);"
+       @keydown.escape.window="showKeyEditor = false">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
+      <div class="px-6 pt-6 pb-3 border-b border-slate-200">
+        <h3 class="text-slate-800 font-semibold" x-text="keyDraft.id ? 'Edit API key' : 'Add API key'"></h3>
+        <p class="text-xs text-slate-400 mt-0.5"
+           x-text="keyDraft.id ? 'Leave the key field blank to keep the current key and only rename.' : 'The key is encrypted before it leaves this page.'"></p>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Label</label>
+          <input x-model="keyDraft.label" type="text" placeholder="Silra prod"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+        </div>
+        <div x-show="!keyDraft.id">
+          <label class="block text-xs font-medium text-slate-700 mb-1">Provider</label>
+          <select x-model="keyDraft.provider"
+                  class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+            <option value="silra">Silra (default)</option>
+            <option value="openai">OpenAI</option>
+            <option value="other">Other (OpenAI-compatible)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1"
+                 x-text="keyDraft.id ? 'Replacement key (optional)' : 'API key'"></label>
+          <textarea x-model="keyDraft.plaintext" rows="3"
+                    placeholder="sk-..." autocomplete="off" spellcheck="false"
+                    class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-teal-500"></textarea>
+          <p class="text-xs text-slate-400 mt-1">
+            Pasted here, encrypted server-side with your password-derived key.
+            We display only the last 4 characters in the list.
+          </p>
+        </div>
+      </div>
+      <div class="px-6 pb-6 flex gap-2 justify-end">
+        <button @click="showKeyEditor = false"
+                :disabled="keyEditorBusy"
+                class="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 text-sm hover:bg-slate-50 disabled:opacity-50">
+          Cancel
+        </button>
+        <button @click="submitKeyEditor()"
+                :disabled="keyEditorBusy"
+                class="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2">
+          <span x-show="keyEditorBusy" class="spinner" style="width:14px;height:14px;border-width:2px;"></span>
+          <span x-text="keyDraft.id ? 'Save changes' : 'Save key'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== API KEY REVEAL ===== -->
+  <div x-show="revealedKey"
+       x-transition.opacity
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="background: rgba(0,0,0,0.5);"
+       @keydown.escape.window="revealedKey = null">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
+      <div class="px-6 pt-6 pb-3 border-b border-slate-200">
+        <h3 class="text-slate-800 font-semibold">API key revealed</h3>
+        <p class="text-xs text-slate-400 mt-0.5">This is a one-time view — close the modal to hide it again.</p>
+      </div>
+      <div class="px-6 py-5">
+        <textarea readonly rows="3"
+                  class="w-full border border-slate-300 bg-slate-50 rounded-lg px-3 py-2 text-sm font-mono"
+                  x-text="revealedKey ? revealedKey.plaintext : ''"></textarea>
+      </div>
+      <div class="px-6 pb-6 flex gap-2 justify-end">
+        <button @click="navigator.clipboard.writeText(revealedKey.plaintext); showToast('Copied to clipboard', 'success')"
+                class="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 text-sm hover:bg-slate-50">
+          Copy
+        </button>
+        <button @click="revealedKey = null"
+                class="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== API KEY DELETE CONFIRM ===== -->
+  <div x-show="keyToDelete"
+       x-transition.opacity
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="background: rgba(0,0,0,0.5);"
+       @keydown.escape.window="keyToDelete = null">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4">
+      <div class="px-6 pt-6 pb-3">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-slate-800 font-semibold">Delete this key?</h3>
+            <p class="text-sm text-slate-500 mt-1" x-text="keyToDelete ? keyToDelete.label : ''"></p>
+            <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+              Any pipeline still using this entry will fail until you add a
+              replacement. The plaintext is unrecoverable.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="px-6 pb-6 flex gap-2 justify-end">
+        <button @click="keyToDelete = null"
+                :disabled="keyDeleteBusy"
+                class="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 text-sm hover:bg-slate-50 disabled:opacity-50">
+          Cancel
+        </button>
+        <button @click="deleteKeyNow()"
+                :disabled="keyDeleteBusy"
+                class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+          <span x-text="keyDeleteBusy ? 'Deleting…' : 'Delete'"></span>
         </button>
       </div>
     </div>
@@ -1862,10 +2105,20 @@
         token: localStorage.getItem('authToken') || null,
         currentUser: null,
         showLoginModal: false,
-        loginEmail: '',
+        loginUsername: '',
         loginPassword: '',
         authLoading: false,
         authError: null,
+
+        // API key vault
+        apiKeys: [],
+        apiKeysLoading: false,
+        showKeyEditor: false,
+        keyDraft: { id: null, label: '', provider: 'silra', plaintext: '' },
+        keyEditorBusy: false,
+        revealedKey: null,
+        keyToDelete: null,
+        keyDeleteBusy: false,
 
         // Toast
         toasts: [],
@@ -1885,19 +2138,23 @@
           // Load saved locale (default zh)
           const saved = localStorage.getItem('locale') || 'zh';
           await this.setLocale(saved);
-          // Restore session if token exists (graceful — auth may be optional)
-          if (this.token) {
-            try {
-              const res = await this._authFetch('/api/auth/me');
-              if (res.ok) {
-                this.currentUser = await res.json();
-              } else if (res.status === 401 || res.status === 404) {
-                this.token = null;
-                localStorage.removeItem('authToken');
-              }
-            } catch (e) {
-              // Server unreachable or auth not enabled — continue as guest
+          // Cookie-based session probe — the browser auto-attaches the
+          // HttpOnly cookie if it exists.
+          try {
+            const res = await this._authFetch('/api/auth/me');
+            if (res.ok) {
+              this.currentUser = await res.json();
+              this.loadApiKeys();
+            } else if (res.status === 401) {
+              // Force the login modal on cold start when no session is
+              // present. The user can't escape without authenticating
+              // (single-tenant rule).
+              this.showLoginModal = true;
             }
+          } catch (e) {
+            // Server unreachable — still show login so the user knows
+            // why nothing else works.
+            this.showLoginModal = true;
           }
           // Check system health in background
           this.checkSystemHealth();
@@ -1915,38 +2172,47 @@
             if (p === 'pipeline') this.loadPipeline();
             if (p === 'upload') this.loadUploadJobs();
             if (p === 'ocrhitl') this.loadHitlDocs();
+            if (p === 'settings') this.loadApiKeys();
             if (p === 'interactive') this.loadInteractiveDocs();
           });
         },
 
         // ---- AUTH ----
+        // Cookie-based session: always send credentials so the
+        // HttpOnly session cookie travels with each request. Legacy
+        // Bearer-token branch removed.
         _authFetch(url, opts = {}) {
-          const headers = { ...(opts.headers || {}) };
-          if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
-          return fetch(url, { ...opts, headers });
+          return fetch(url, { credentials: 'include', ...opts });
         },
 
         async login() {
           this.authLoading = true;
           this.authError = null;
-          const fd = new FormData();
-          fd.append('username', this.loginEmail);
-          fd.append('password', this.loginPassword);
           try {
-            const res = await fetch('/api/auth/login', { method: 'POST', body: fd });
+            // Cookie-based session: backend sets an HttpOnly cookie on
+            // success, so we just need credentials:'include' on every
+            // subsequent fetch. No localStorage token to manage.
+            const res = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                username: this.loginUsername.trim(),
+                password: this.loginPassword,
+              }),
+            });
             if (!res.ok) {
               const err = await res.json().catch(() => ({}));
               throw new Error(err.detail || `HTTP ${res.status}`);
             }
-            const data = await res.json();
-            this.token = data.access_token;
-            localStorage.setItem('authToken', this.token);
-            const meRes = await this._authFetch('/api/auth/me');
-            if (meRes.ok) this.currentUser = await meRes.json();
+            this.currentUser = await res.json();
             this.showLoginModal = false;
-            this.loginEmail = '';
+            this.loginUsername = '';
             this.loginPassword = '';
             this.showToast(this.t('toast.loggedIn') || 'Logged in', 'success');
+            // Pull the user's stored API keys in the background so the
+            // settings page is ready when they navigate to it.
+            this.loadApiKeys();
           } catch (e) {
             this.authError = e.message;
           } finally {
@@ -1954,11 +2220,120 @@
           }
         },
 
-        logout() {
-          this.token = null;
+        async logout() {
+          try {
+            await fetch('/api/auth/logout', {
+              method: 'POST', credentials: 'include',
+            });
+          } catch (e) { /* non-fatal — local state still clears */ }
           this.currentUser = null;
-          localStorage.removeItem('authToken');
+          this.apiKeys = [];
           this.showToast(this.t('toast.loggedOut') || 'Logged out', 'info');
+        },
+
+        // ---- API KEY VAULT ----
+        async loadApiKeys() {
+          if (!this.currentUser) return;
+          this.apiKeysLoading = true;
+          try {
+            const res = await fetch('/api/keys', { credentials: 'include' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            this.apiKeys = data.keys || [];
+          } catch (e) {
+            this.showToast(`Could not load keys: ${e.message}`, 'error');
+            this.apiKeys = [];
+          } finally {
+            this.apiKeysLoading = false;
+          }
+        },
+
+        openKeyEditor(existing) {
+          // Existing row -> rename or rotate; null -> create new.
+          this.keyDraft = existing
+            ? { id: existing.id, label: existing.label, provider: existing.provider, plaintext: '' }
+            : { id: null, label: '', provider: 'silra', plaintext: '' };
+          this.revealedKey = null;
+          this.showKeyEditor = true;
+        },
+
+        async submitKeyEditor() {
+          const d = this.keyDraft;
+          if (!d.label.trim()) {
+            this.showToast('Label is required', 'error');
+            return;
+          }
+          if (!d.id && !d.plaintext.trim()) {
+            this.showToast('Paste your API key to create a new entry', 'error');
+            return;
+          }
+          this.keyEditorBusy = true;
+          try {
+            const path = d.id ? `/api/keys/${d.id}` : '/api/keys';
+            const method = d.id ? 'PUT' : 'POST';
+            const body = d.id
+              ? {
+                  label: d.label,
+                  ...(d.plaintext.trim() ? { plaintext: d.plaintext } : {}),
+                }
+              : { label: d.label, provider: d.provider, plaintext: d.plaintext };
+            const res = await fetch(path, {
+              method, credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.detail || `HTTP ${res.status}`);
+            }
+            await this.loadApiKeys();
+            this.showKeyEditor = false;
+            this.keyDraft = { id: null, label: '', provider: 'silra', plaintext: '' };
+            this.showToast(d.id ? 'Key updated' : 'Key saved', 'success');
+          } catch (e) {
+            this.showToast(`Save failed: ${e.message}`, 'error');
+          } finally {
+            this.keyEditorBusy = false;
+          }
+        },
+
+        async revealApiKey(row) {
+          try {
+            const res = await fetch(`/api/keys/${row.id}/reveal`, { credentials: 'include' });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.detail || `HTTP ${res.status}`);
+            }
+            const data = await res.json();
+            this.revealedKey = { id: row.id, plaintext: data.plaintext };
+          } catch (e) {
+            this.showToast(`Reveal failed: ${e.message}`, 'error');
+          }
+        },
+
+        confirmDeleteKey(row) {
+          this.keyToDelete = row;
+        },
+
+        async deleteKeyNow() {
+          if (!this.keyToDelete) return;
+          this.keyDeleteBusy = true;
+          try {
+            const res = await fetch(`/api/keys/${this.keyToDelete.id}`, {
+              method: 'DELETE', credentials: 'include',
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.detail || `HTTP ${res.status}`);
+            }
+            await this.loadApiKeys();
+            this.showToast(`Deleted "${this.keyToDelete.label}"`, 'success');
+            this.keyToDelete = null;
+          } catch (e) {
+            this.showToast(`Delete failed: ${e.message}`, 'error');
+          } finally {
+            this.keyDeleteBusy = false;
+          }
         },
 
         // ---- I18N ----
