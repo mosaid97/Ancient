@@ -912,169 +912,236 @@
 
     <!-- ===== PAGE: DASHBOARD ===== -->
     <div x-show="page === 'dashboard'" class="flex flex-col h-full page-content overflow-y-auto scrollable">
-      <div class="px-6 py-5">
-        <!-- Header -->
-        <div class="flex items-center justify-between mb-6">
-          <div>
-            <h1 class="text-slate-800 text-xl font-semibold cjk" x-text="t('dashboard.title')"></h1>
-            <p class="text-slate-400 text-sm" x-text="t('dashboard.subtitle')"></p>
+      <div class="px-6 py-5 max-w-6xl mx-auto w-full">
+
+        <!-- Hero / quick search -->
+        <div class="bg-gradient-to-br from-teal-600 to-indigo-700 rounded-2xl p-6 mb-6 text-white">
+          <h1 class="text-2xl font-semibold mb-1 cjk">Search Ancient China</h1>
+          <p class="text-teal-100 text-sm mb-4">
+            Type a phrase from a classical source, or ask a question. Every result is checked against the original page before it reaches you.
+          </p>
+          <form @submit.prevent="runDashboardSearch()" class="flex gap-2">
+            <input
+              x-model="dashboardQuery"
+              type="text"
+              placeholder="e.g. 十惡尤切 or What is the 科舉 system?"
+              class="flex-1 px-4 py-3 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-white/50 cjk"
+              autocomplete="off"
+            />
+            <button type="submit"
+                    class="px-5 py-3 bg-white text-teal-700 rounded-lg font-medium hover:bg-teal-50 transition-colors flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+              <span class="cjk">Search</span>
+            </button>
+          </form>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <span class="text-xs text-teal-100 mr-1">Try:</span>
+            <template x-for="ex in dashboardExamples" :key="ex">
+              <button @click="dashboardQuery = ex; runDashboardSearch()"
+                      class="text-xs px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-full transition-colors cjk"
+                      x-text="ex"></button>
+            </template>
           </div>
-          <button @click="loadStats()"
-                  class="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"/>
-            </svg>
-            <span class="cjk" x-text="t('common.refresh')"></span>
-          </button>
         </div>
 
-        <!-- Loading -->
+        <!-- Trust + quality KPI cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+
+          <!-- Trust card -->
+          <div class="bg-white rounded-xl border border-slate-200 p-5">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <h3 class="text-slate-700 font-semibold text-sm">Verified citations</h3>
+                <p class="text-xs text-slate-400 mt-0.5">How often the source check passed in the last session.</p>
+              </div>
+              <div class="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-4xl font-bold" :class="verifiedRateColor()"
+                    x-text="verifiedRatePct() === null ? '—' : verifiedRatePct().toFixed(1) + '%'"></span>
+              <span class="text-xs text-slate-400"
+                    x-text="(verification?.counts?.ok || 0).toLocaleString() + ' of ' + (((verification?.counts?.ok || 0) + (verification?.counts?.insufficient_evidence || 0))).toLocaleString() + ' checked'"></span>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">
+              <span class="font-medium text-slate-700">What this means:</span>
+              of the results where we had a verbatim span to verify, this many passed the source-substring check after philological normalization.
+            </p>
+            <button @click="navigateTo('pipeline')"
+                    class="text-xs text-teal-600 hover:text-teal-700 mt-3 font-medium">
+              View failures →
+            </button>
+          </div>
+
+          <!-- Quality card -->
+          <div class="bg-white rounded-xl border border-slate-200 p-5">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <h3 class="text-slate-700 font-semibold text-sm">Search quality</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Last benchmark run · <span x-text="evalAgeText()"></span></p>
+              </div>
+              <div class="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                </svg>
+              </div>
+            </div>
+            <template x-if="evalMetrics && evalMetrics.available">
+              <div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <div class="text-xs text-slate-500 mb-0.5">NDCG@<span x-text="evalMetrics.k || 10"></span></div>
+                    <div class="text-2xl font-semibold text-slate-800"
+                         x-text="ndcgPct() === null ? '—' : ndcgPct().toFixed(1) + '%'"></div>
+                    <div class="text-[10px] text-slate-400"
+                         x-text="evalMetrics.overall?.ndcg_at_k ? '95% CI: ' + (evalMetrics.overall.ndcg_at_k.ci_low*100).toFixed(1) + '–' + (evalMetrics.overall.ndcg_at_k.ci_high*100).toFixed(1) + '%' : ''"></div>
+                  </div>
+                  <div>
+                    <div class="text-xs text-slate-500 mb-0.5">Faithfulness</div>
+                    <div class="text-2xl font-semibold text-slate-800"
+                         x-text="faithfulnessPct() === null ? '—' : faithfulnessPct().toFixed(1) + '%'"></div>
+                    <div class="text-[10px] text-slate-400">
+                      <template x-if="faithfulnessCI()">
+                        <span>95% CI: <span x-text="faithfulnessCI()"></span></span>
+                      </template>
+                      <template x-if="!faithfulnessCI()">
+                        <span>over <span x-text="faithfulnessN()"></span> queries</span>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+                <p class="text-xs text-slate-500 mt-3">
+                  <span class="font-medium text-slate-700">NDCG@k</span> measures how well the top results match what an expert would pick.
+                  <span class="font-medium text-slate-700">Faithfulness</span> measures how often the cited span is provably in the source.
+                </p>
+              </div>
+            </template>
+            <template x-if="!evalMetrics || !evalMetrics.available">
+              <div class="text-sm text-slate-500 py-2">
+                No benchmark run yet.
+                <code class="text-xs bg-slate-100 px-1.5 py-0.5 rounded">uv run python -m eval.harness</code>
+                generates these metrics.
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Verifier outcome breakdown -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <h3 class="text-slate-700 font-semibold text-sm">What happened to recent search results</h3>
+              <p class="text-xs text-slate-400 mt-0.5">
+                Out of <span x-text="(verification?.total || 0).toLocaleString()"></span> result(s) checked since the server started
+                (<span x-text="Math.round((verification?.uptime_seconds || 0) / 60)"></span> min ago).
+              </p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="flex items-center justify-center" style="height: 200px;">
+              <canvas id="verifierChart" width="200" height="200"></canvas>
+            </div>
+            <div class="space-y-2 text-sm">
+              <div class="flex items-center justify-between p-2 rounded-lg bg-emerald-50">
+                <span class="flex items-center gap-2 text-slate-700">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                  <span class="font-medium">Verified</span>
+                </span>
+                <span class="font-semibold text-emerald-700" x-text="(verification?.counts?.ok || 0).toLocaleString()"></span>
+              </div>
+              <div class="flex items-center justify-between p-2 rounded-lg bg-sky-50">
+                <span class="flex items-center gap-2 text-slate-700">
+                  <span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
+                  <span class="font-medium">Matched via translation only</span>
+                </span>
+                <span class="font-semibold text-sky-700" x-text="(verification?.counts?.translation_match || 0).toLocaleString()"></span>
+              </div>
+              <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50">
+                <span class="flex items-center gap-2 text-slate-700">
+                  <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                  <span class="font-medium">No verbatim span to check</span>
+                </span>
+                <span class="font-semibold text-slate-600" x-text="(verification?.counts?.not_applicable || 0).toLocaleString()"></span>
+              </div>
+              <div class="flex items-center justify-between p-2 rounded-lg bg-rose-50">
+                <span class="flex items-center gap-2 text-slate-700">
+                  <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                  <span class="font-medium">Dropped (unverified)</span>
+                </span>
+                <span class="font-semibold text-rose-700" x-text="(verification?.counts?.insufficient_evidence || 0).toLocaleString()"></span>
+              </div>
+              <p class="text-xs text-slate-500 pt-2">
+                <span class="font-medium">Dropped</span> means the cited span was not found in the source — those results never reach you.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loading + stats fallback -->
         <div x-show="statsLoading" class="flex items-center justify-center py-16">
           <div class="spinner"></div>
         </div>
 
         <div x-show="!statsLoading && stats">
 
-          <!-- Stat cards -->
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <!-- Docs -->
-            <div class="bg-white rounded-xl border border-slate-200 p-5">
-              <div class="flex items-center justify-between mb-3">
-                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide cjk" x-text="t('dashboard.documents')"></span>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-teal-100">
-                  <svg class="w-4 h-4 text-teal-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                  </svg>
+          <!-- Library overview (single row, low-emphasis) -->
+          <div class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <h3 class="text-slate-700 font-semibold text-sm">Your library</h3>
+                <p class="text-xs text-slate-400 mt-0.5">What is currently indexed and searchable.</p>
+              </div>
+              <button @click="loadStats(); loadVerification(); loadEval();"
+                      class="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"/>
+                </svg>
+                Refresh
+              </button>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <div class="text-xs text-slate-500 mb-1">Documents</div>
+                <div class="text-2xl font-semibold text-slate-800" x-text="(stats?.documents?.total || 0).toLocaleString()"></div>
+                <div class="text-[10px] text-slate-400 mt-0.5">
+                  <span x-text="(stats?.documents?.primary || 0).toLocaleString()"></span> primary ·
+                  <span x-text="(stats?.documents?.secondary || 0).toLocaleString()"></span> secondary
                 </div>
               </div>
-              <div class="text-3xl font-bold text-slate-800" x-text="(stats && stats.documents && stats.documents.total || 0).toLocaleString()"></div>
-              <div class="flex gap-3 mt-2">
-                <span class="text-xs text-emerald-600 cjk"><span x-text="t('dashboard.primary')"></span> <span x-text="stats && stats.documents && stats.documents.primary || 0"></span></span>
-                <span class="text-xs text-indigo-600 cjk"><span x-text="t('dashboard.secondary')"></span> <span x-text="stats && stats.documents && stats.documents.secondary || 0"></span></span>
-              </div>
-            </div>
-
-            <!-- Pages -->
-            <div class="bg-white rounded-xl border border-slate-200 p-5">
-              <div class="flex items-center justify-between mb-3">
-                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide cjk" x-text="t('dashboard.pages')"></span>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-100">
-                  <svg class="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/>
-                  </svg>
+              <div>
+                <div class="text-xs text-slate-500 mb-1">Pages</div>
+                <div class="text-2xl font-semibold text-slate-800" x-text="(stats?.pages?.total || 0).toLocaleString()"></div>
+                <div class="text-[10px] text-slate-400 mt-0.5">
+                  <span x-text="(stats?.pages?.ocr || 0).toLocaleString()"></span> OCR ·
+                  <span x-text="(stats?.pages?.native || 0).toLocaleString()"></span> native
                 </div>
               </div>
-              <div class="text-3xl font-bold text-slate-800" x-text="(stats && stats.pages && stats.pages.total || 0).toLocaleString()"></div>
-              <div class="flex gap-3 mt-2">
-                <span class="text-xs text-slate-500 cjk"><span x-text="t('dashboard.ocr')"></span> <span x-text="stats && stats.pages && stats.pages.ocr || 0"></span></span>
-                <span class="text-xs text-slate-500 cjk"><span x-text="t('dashboard.native')"></span> <span x-text="stats && stats.pages && stats.pages.native || 0"></span></span>
-              </div>
-            </div>
-
-            <!-- Chunks -->
-            <div class="bg-white rounded-xl border border-slate-200 p-5">
-              <div class="flex items-center justify-between mb-3">
-                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide cjk" x-text="t('dashboard.chunks')"></span>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-100">
-                  <svg class="w-4 h-4 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-                  </svg>
+              <div>
+                <div class="text-xs text-slate-500 mb-1">Searchable chunks</div>
+                <div class="text-2xl font-semibold text-slate-800" x-text="(stats?.chunks?.embedded || 0).toLocaleString()"></div>
+                <div class="text-[10px] text-slate-400 mt-0.5">
+                  of <span x-text="(stats?.chunks?.total || 0).toLocaleString()"></span> total
                 </div>
               </div>
-              <div class="text-3xl font-bold text-slate-800" x-text="(stats && stats.chunks && stats.chunks.total || 0).toLocaleString()"></div>
-              <div class="flex gap-3 mt-2">
-                <span class="text-xs text-emerald-600 cjk"><span x-text="t('dashboard.translated')"></span> <span x-text="stats && stats.chunks && stats.chunks.translated || 0"></span></span>
-                <span class="text-xs text-slate-400 cjk"><span x-text="t('dashboard.embedded')"></span> <span x-text="stats && stats.chunks && stats.chunks.embedded || 0"></span></span>
-              </div>
-            </div>
-
-            <!-- Keywords -->
-            <div class="bg-white rounded-xl border border-slate-200 p-5">
-              <div class="flex items-center justify-between mb-3">
-                <span class="text-xs font-medium text-slate-500 uppercase tracking-wide cjk" x-text="t('dashboard.keywords')"></span>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-100">
-                  <svg class="w-4 h-4 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 0 1 0 2.828l-7 7a2 2 0 0 1-2.828 0l-7-7A1.994 1.994 0 0 1 3 12V7a4 4 0 0 1 4-4z"/>
-                  </svg>
+              <div>
+                <div class="text-xs text-slate-500 mb-1">Topics & keywords</div>
+                <div class="text-2xl font-semibold text-slate-800" x-text="(stats?.keywords?.total || 0).toLocaleString()"></div>
+                <div class="text-[10px] text-slate-400 mt-0.5">
+                  <span x-text="(stats?.communities?.total || 0).toLocaleString()"></span> communities
                 </div>
               </div>
-              <div class="text-3xl font-bold text-slate-800" x-text="(stats && stats.keywords && stats.keywords.total || 0).toLocaleString()"></div>
-              <div class="flex gap-3 mt-2">
-                <span class="text-xs text-purple-600 cjk"><span x-text="t('dashboard.community')"></span> <span x-text="stats && stats.communities && stats.communities.total || 0"></span></span>
-              </div>
             </div>
-          </div>
-
-          <!-- Progress bars -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-            <!-- Translation progress -->
-            <div class="bg-white rounded-xl border border-slate-200 p-5">
-              <div class="flex items-center justify-between mb-3">
-                <div>
-                  <h3 class="text-slate-700 font-semibold cjk text-sm" x-text="t('dashboard.translationProgress')"></h3>
-                </div>
-                <span class="flex items-center gap-1.5 bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full font-medium cjk">
-                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500 pulse-dot"></span>
-                  <span x-text="t('dashboard.inProgress')"></span>
-                </span>
-              </div>
-              <div class="flex items-baseline gap-2 mb-2">
-                <span class="text-2xl font-bold text-slate-800" x-text="(stats && stats.translation_progress && stats.translation_progress.ok || 0).toLocaleString()"></span>
-                <span class="text-slate-400 text-sm cjk">/ <span x-text="(stats && stats.translation_progress && stats.translation_progress.total || 0).toLocaleString()"></span></span>
-                <span class="ml-auto text-amber-600 font-semibold text-sm" x-text="(stats && stats.translation_progress && stats.translation_progress.pct || 0).toFixed(1) + '%'"></span>
-              </div>
-              <div class="progress-track">
-                <div class="progress-fill bg-amber-400"
-                     :style="'width:' + (stats && stats.translation_progress && stats.translation_progress.pct || 0) + '%'"></div>
-              </div>
-              <div class="text-xs text-slate-400 mt-2 cjk">
-                <span x-text="t('dashboard.failed')"></span> <span x-text="stats && stats.translation_progress && stats.translation_progress.failed || 0"></span>
-              </div>
-            </div>
-
-            <!-- Embedding progress -->
-            <div class="bg-white rounded-xl border border-slate-200 p-5">
-              <div class="flex items-center justify-between mb-3">
-                <div>
-                  <h3 class="text-slate-700 font-semibold cjk text-sm" x-text="t('dashboard.embeddingProgress')"></h3>
-                </div>
-                <span class="flex items-center gap-1.5 bg-teal-100 text-teal-700 text-xs px-2 py-1 rounded-full font-medium cjk">
-                  <span class="w-1.5 h-1.5 rounded-full bg-teal-500 pulse-dot"></span>
-                  <span x-text="t('dashboard.inProgress')"></span>
-                </span>
-              </div>
-              <div class="flex items-baseline gap-2 mb-2">
-                <span class="text-2xl font-bold text-slate-800" x-text="(stats && stats.embedding_progress && stats.embedding_progress.ok || 0).toLocaleString()"></span>
-                <span class="text-slate-400 text-sm cjk">/ <span x-text="(stats && stats.embedding_progress && stats.embedding_progress.total || 0).toLocaleString()"></span></span>
-                <span class="ml-auto text-teal-600 font-semibold text-sm" x-text="(stats && stats.embedding_progress && stats.embedding_progress.pct || 0).toFixed(1) + '%'"></span>
-              </div>
-              <div class="progress-track">
-                <div class="progress-fill" style="background: #14b8a6;"
-                     :style="'width:' + (stats && stats.embedding_progress && stats.embedding_progress.pct || 0) + '%'"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Charts -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-            <!-- Donut chart -->
-            <div class="bg-white rounded-xl border border-slate-200 p-5">
-              <h3 class="text-slate-700 font-semibold cjk text-sm mb-4" x-text="t('dashboard.chunkTierDist')"></h3>
-              <div class="flex items-center justify-center" style="height: 200px;">
-                <canvas id="tierChart" width="200" height="200"></canvas>
-              </div>
-            </div>
-            <!-- Bar chart -->
-            <div class="bg-white rounded-xl border border-slate-200 p-5">
-              <h3 class="text-slate-700 font-semibold cjk text-sm mb-4" x-text="t('dashboard.ocrPageStatus')"></h3>
-              <div style="height: 200px;">
-                <canvas id="ocrStatusChart"></canvas>
-              </div>
+            <div class="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3 text-xs">
+              <span class="text-slate-500">Pipeline still ingesting?</span>
+              <button @click="navigateTo('pipeline')"
+                      class="text-teal-600 hover:text-teal-700 font-medium">
+                See progress →
+              </button>
             </div>
           </div>
 
@@ -1848,6 +1915,16 @@
         stats: null,
         statsLoading: false,
         charts: {},
+        verification: null,
+        evalMetrics: null,
+        dashboardQuery: '',
+        dashboardExamples: [
+          '十惡尤切',
+          '貞觀之治',
+          '科舉制度',
+          '唐律疏議',
+          '安史之亂',
+        ],
 
         // Pipeline
         pipelineJobs: [],
@@ -1904,13 +1981,19 @@
           // Load stats if on dashboard
           if (this.page === 'dashboard') {
             await this.loadStats();
+            this.loadVerification();
+            this.loadEval();
           }
         },
 
         navigateTo(p) {
           this.page = p;
           this.$nextTick(() => {
-            if (p === 'dashboard' && !this.stats) this.loadStats();
+            if (p === 'dashboard') {
+              if (!this.stats) this.loadStats();
+              this.loadVerification();
+              this.loadEval();
+            }
             if (p === 'review' && this.reviewQueue.length === 0) this.loadReviewQueue();
             if (p === 'pipeline') this.loadPipeline();
             if (p === 'upload') this.loadUploadJobs();
@@ -2616,6 +2699,115 @@
           }
         },
 
+        async loadVerification() {
+          try {
+            const res = await fetch('/api/admin/verification');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            this.verification = await res.json();
+          } catch (e) {
+            this.verification = {
+              counts: { ok: 0, translation_match: 0, not_applicable: 0, insufficient_evidence: 0 },
+              total: 0, verified_rate: null, uptime_seconds: 0,
+              recent_failures: [], persisted_failures_by_mode: {},
+            };
+          }
+          await this.$nextTick();
+          this.drawVerifierChart();
+        },
+
+        async loadEval() {
+          try {
+            const res = await fetch('/api/admin/eval');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            this.evalMetrics = await res.json();
+          } catch (e) {
+            this.evalMetrics = { available: false };
+          }
+        },
+
+        drawVerifierChart() {
+          if (!this.verification) return;
+          if (this.charts.verifier) this.charts.verifier.destroy();
+          const canvas = document.getElementById('verifierChart');
+          if (!canvas) return;
+          const c = this.verification.counts || {};
+          const total = (c.ok || 0) + (c.translation_match || 0) + (c.not_applicable || 0) + (c.insufficient_evidence || 0);
+          if (total === 0) return;
+          this.charts.verifier = new Chart(canvas, {
+            type: 'doughnut',
+            data: {
+              labels: ['Verified', 'Translation match', 'No verbatim span', 'Dropped (unverified)'],
+              datasets: [{
+                data: [c.ok || 0, c.translation_match || 0, c.not_applicable || 0, c.insufficient_evidence || 0],
+                backgroundColor: ['#10b981', '#0ea5e9', '#94a3b8', '#ef4444'],
+                borderColor: '#fff',
+                borderWidth: 3,
+              }],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: true,
+              plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10, boxWidth: 12 } },
+                tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.parsed.toLocaleString()}` } },
+              },
+              cutout: '65%',
+            },
+          });
+        },
+
+        // Plain-language helpers for KPI cards
+        verifiedRatePct() {
+          const r = this.verification?.verified_rate;
+          return (r === null || r === undefined) ? null : (r * 100);
+        },
+        verifiedRateColor() {
+          const p = this.verifiedRatePct();
+          if (p === null) return 'text-slate-400';
+          if (p >= 90) return 'text-emerald-600';
+          if (p >= 70) return 'text-amber-600';
+          return 'text-rose-600';
+        },
+        ndcgPct() {
+          const m = this.evalMetrics?.overall?.ndcg_at_k;
+          return (m && m.mean !== undefined && m.mean !== null) ? (m.mean * 100) : null;
+        },
+        faithfulnessPct() {
+          // eval harness writes verified_rate as either a scalar (legacy)
+          // or a bootstrap-CI dict {mean, ci_low, ci_high, n} — handle both.
+          const v = this.evalMetrics?.faithfulness?.verified_rate;
+          if (v === null || v === undefined) return null;
+          const mean = (typeof v === 'object') ? v.mean : v;
+          return (mean === null || mean === undefined) ? null : (mean * 100);
+        },
+        faithfulnessCI() {
+          const v = this.evalMetrics?.faithfulness?.verified_rate;
+          if (!v || typeof v !== 'object') return null;
+          if (v.ci_low === undefined || v.ci_high === undefined) return null;
+          return (v.ci_low * 100).toFixed(1) + '–' + (v.ci_high * 100).toFixed(1) + '%';
+        },
+        faithfulnessN() {
+          const f = this.evalMetrics?.faithfulness;
+          if (!f) return 0;
+          return f.n_queries || f.verified_rate?.n || 0;
+        },
+        evalAgeText() {
+          const ts = this.evalMetrics?.eval_timestamp;
+          if (!ts) return 'never';
+          const d = new Date(ts);
+          const days = Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+          if (days === 0) return 'today';
+          if (days === 1) return 'yesterday';
+          return `${days} days ago`;
+        },
+        runDashboardSearch() {
+          const q = (this.dashboardQuery || '').trim();
+          if (!q) return;
+          this.query = q;
+          this.navigateTo('search');
+          this.$nextTick(() => { this.runSearch?.(); });
+        },
+
         drawCharts() {
           if (!this.stats) return;
 
@@ -2625,6 +2817,7 @@
 
           const tierCanvas = document.getElementById('tierChart');
           const ocrCanvas = document.getElementById('ocrStatusChart');
+          // Dashboard removed these; pipeline page may still mount them.
           if (!tierCanvas || !ocrCanvas) return;
 
           // Donut: tier distribution
