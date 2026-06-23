@@ -1005,8 +1005,14 @@
                     <div class="text-xs text-slate-500 mb-0.5">Faithfulness</div>
                     <div class="text-2xl font-semibold text-slate-800"
                          x-text="faithfulnessPct() === null ? '—' : faithfulnessPct().toFixed(1) + '%'"></div>
-                    <div class="text-[10px] text-slate-400"
-                         x-text="evalMetrics.faithfulness ? 'over ' + (evalMetrics.faithfulness.n_queries || 0) + ' queries' : ''"></div>
+                    <div class="text-[10px] text-slate-400">
+                      <template x-if="faithfulnessCI()">
+                        <span>95% CI: <span x-text="faithfulnessCI()"></span></span>
+                      </template>
+                      <template x-if="!faithfulnessCI()">
+                        <span>over <span x-text="faithfulnessN()"></span> queries</span>
+                      </template>
+                    </div>
                   </div>
                 </div>
                 <p class="text-xs text-slate-500 mt-3">
@@ -2767,8 +2773,23 @@
           return (m && m.mean !== undefined && m.mean !== null) ? (m.mean * 100) : null;
         },
         faithfulnessPct() {
+          // eval harness writes verified_rate as either a scalar (legacy)
+          // or a bootstrap-CI dict {mean, ci_low, ci_high, n} — handle both.
           const v = this.evalMetrics?.faithfulness?.verified_rate;
-          return (v === null || v === undefined) ? null : (v * 100);
+          if (v === null || v === undefined) return null;
+          const mean = (typeof v === 'object') ? v.mean : v;
+          return (mean === null || mean === undefined) ? null : (mean * 100);
+        },
+        faithfulnessCI() {
+          const v = this.evalMetrics?.faithfulness?.verified_rate;
+          if (!v || typeof v !== 'object') return null;
+          if (v.ci_low === undefined || v.ci_high === undefined) return null;
+          return (v.ci_low * 100).toFixed(1) + '–' + (v.ci_high * 100).toFixed(1) + '%';
+        },
+        faithfulnessN() {
+          const f = this.evalMetrics?.faithfulness;
+          if (!f) return 0;
+          return f.n_queries || f.verified_rate?.n || 0;
         },
         evalAgeText() {
           const ts = this.evalMetrics?.eval_timestamp;
