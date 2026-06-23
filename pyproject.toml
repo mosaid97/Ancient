@@ -36,6 +36,13 @@ dependencies = [
     "reportlab>=4.5.1",
     "unidic-lite>=1.0.8",
     "uvicorn>=0.48.0",
+    "argon2-cffi>=25.1.0",
+    "cryptography>=49.0.0",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.31.0",
+    "alembic>=1.18.4",
+    "pydantic[email]>=2.13.4",
+    "slowapi>=0.1.10",
 ]
 
 [dependency-groups]

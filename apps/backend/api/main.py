@@ -33,6 +33,11 @@ from apps.backend.api.routers import (  # noqa: E402
     search,
     upload,
 )
+from slowapi import _rate_limit_exceeded_handler  # noqa: E402
+from slowapi.errors import RateLimitExceeded  # noqa: E402
+
+from apps.backend.auth import keys as auth_keys  # noqa: E402
+from apps.backend.auth import router as auth_router  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -61,7 +66,12 @@ app.add_middleware(
     allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
+
+# Hook slowapi for the login rate limiter declared on auth_router.
+app.state.limiter = auth_router.limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ---------------------------------------------------------------------------
 # Routers
@@ -74,6 +84,8 @@ app.include_router(hitl.router,      prefix="/api/hitl",        tags=["hitl"])
 app.include_router(upload.router,    prefix="/api/upload",      tags=["upload"])
 app.include_router(interactive.router, prefix="/api/interactive", tags=["interactive"])
 app.include_router(admin.router,     prefix="/api/admin",       tags=["admin"])
+app.include_router(auth_router.router, prefix="/api/auth",      tags=["auth"])
+app.include_router(auth_keys.router, prefix="/api/keys",        tags=["keys"])
 
 # ---------------------------------------------------------------------------
 # Static / SPA
