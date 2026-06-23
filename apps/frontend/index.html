@@ -816,6 +816,40 @@
           <!-- Scrollable content -->
           <div class="flex-1 overflow-y-auto scrollable px-6 py-4 space-y-4">
 
+            <!-- Original page image — sits ABOVE the OCR comparison so the
+                 reviewer can scroll between source and engine outputs. The
+                 endpoint returns 404 when imageUri is unset; we hide the
+                 card cleanly in that case instead of showing a broken icon. -->
+            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div class="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide cjk">Original page</span>
+                <span x-show="pageDetail && pageDetail.page && pageDetail.page.image_uri"
+                      class="text-xs text-slate-400">Variant:
+                  <button @click="reviewImageVariant = 'original'"
+                          :class="reviewImageVariant === 'original' ? 'text-teal-600 font-medium' : 'text-slate-500 hover:text-slate-700'">original</button>
+                  <span class="text-slate-300"> / </span>
+                  <button @click="reviewImageVariant = 'preprocessed'"
+                          :class="reviewImageVariant === 'preprocessed' ? 'text-teal-600 font-medium' : 'text-slate-500 hover:text-slate-700'">preprocessed</button>
+                </span>
+              </div>
+              <div class="p-3 flex items-center justify-center bg-slate-50" style="min-height: 240px; max-height: 70vh;">
+                <img x-show="pageDetail && pageDetail.page && pageDetail.page.image_uri && !reviewImageBroken"
+                     :src="pageDetail && pageDetail.page ? ('/api/image/' + encodeURIComponent(pageDetail.page.page_id) + '?variant=' + reviewImageVariant) : ''"
+                     @error="reviewImageBroken = true"
+                     @load="reviewImageBroken = false"
+                     class="max-w-full max-h-[68vh] rounded shadow-sm" />
+                <div x-show="!pageDetail || !pageDetail.page || !pageDetail.page.image_uri || reviewImageBroken"
+                     class="flex flex-col items-center justify-center text-center text-slate-400 py-8">
+                  <svg class="w-10 h-10 mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                  </svg>
+                  <div class="text-sm font-medium text-slate-500">No scanned image for this page</div>
+                  <div class="text-xs mt-1">Compare the OCR outputs directly below.</div>
+                </div>
+              </div>
+            </div>
+
             <!-- OCR Tab group -->
             <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
               <div class="flex border-b border-slate-200">
@@ -890,7 +924,7 @@
                         </div>
                       </div>
                     </div>
-                    <button @click="openCorrectionModal(chunk)"
+                    <button @click="populateCorrectionSidebar(chunk)"
                             class="mt-2 text-xs text-blue-600 hover:text-blue-800 cjk transition-colors"
                             x-text="t('review.submitPara')">
                     </button>
@@ -915,10 +949,6 @@
                     class="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium cjk transition-colors">
               <span x-text="t('review.flag')"></span>
             </button>
-            <button @click="openCorrectionModal(null)"
-                    class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium cjk transition-colors">
-              <span x-text="t('review.correct')"></span>
-            </button>
             <button @click="goNextReview()"
                     class="flex items-center gap-2 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm font-medium cjk transition-colors ml-auto"
                     x-text="t('review.nextPage')">
@@ -930,6 +960,78 @@
         <div x-show="selectedReviewItem && !pageDetail"
              class="flex items-center justify-center h-full">
           <div class="spinner"></div>
+        </div>
+      </div>
+
+      <!-- Right sidebar: persistent correction panel.
+           Visible whenever a review item is selected, so the reviewer can
+           see the original image, the OCR comparison, and the correction
+           input simultaneously without losing context to a modal. -->
+      <div x-show="selectedReviewItem && pageDetail"
+           class="w-96 flex-shrink-0 bg-white border-l border-slate-200 flex flex-col h-full">
+        <div class="px-5 py-4 border-b border-slate-200">
+          <h3 class="text-slate-800 font-semibold cjk text-sm">Submit correction</h3>
+          <p class="text-xs text-slate-400 mt-0.5">Click a paragraph below to pre-fill, or write a page-level note.</p>
+        </div>
+        <div class="flex-1 overflow-y-auto scrollable px-5 py-4 space-y-4">
+          <!-- Target paragraph -->
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1.5 cjk">Target</label>
+            <select x-model="correction.chunk_id"
+                    class="w-full border border-slate-300 rounded-lg px-2.5 py-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500">
+              <option value="">Page-level correction (no paragraph)</option>
+              <template x-for="(c, i) in (pageDetail && pageDetail.chunks || [])" :key="c.chunk_id">
+                <option :value="c.chunk_id"
+                        x-text="'Paragraph ' + (i + 1) + ' · ' + (c.text || '').slice(0, 30) + ((c.text || '').length > 30 ? '…' : '')"></option>
+              </template>
+            </select>
+          </div>
+
+          <!-- Corrected text -->
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1.5 cjk">Corrected text</label>
+            <textarea x-model="correction.corrected_text"
+                      rows="10"
+                      placeholder="Re-type the passage as it should read…"
+                      class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs cjk leading-relaxed resize-y focus:outline-none focus:ring-1 focus:ring-teal-500"></textarea>
+          </div>
+
+          <!-- Problem class -->
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1.5 cjk">Problem class</label>
+            <select x-model="correction.problem_class"
+                    class="w-full border border-slate-300 rounded-lg px-2.5 py-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500">
+              <option value="">— select —</option>
+              <option value="RARE_GLYPH">RARE_GLYPH (rare character)</option>
+              <option value="DEGRADATION">DEGRADATION (faded ink / damage)</option>
+              <option value="LAYOUT_AMBIGUITY">LAYOUT_AMBIGUITY (column / table)</option>
+              <option value="READING_ORDER">READING_ORDER (wrong sequence)</option>
+              <option value="KANBUN_KUNTEN">KANBUN_KUNTEN (kanbun marks)</option>
+              <option value="EDITORIAL_VS_SOURCE">EDITORIAL_VS_SOURCE</option>
+              <option value="POLYSEMY">POLYSEMY</option>
+              <option value="CULTURAL_REF">CULTURAL_REF</option>
+            </select>
+          </div>
+
+          <!-- Notes -->
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1.5 cjk">Notes (teaches the model)</label>
+            <textarea x-model="correction.notes"
+                      rows="3"
+                      placeholder="Why is the OCR wrong? What clued you in?"
+                      class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs cjk leading-relaxed resize-y focus:outline-none focus:ring-1 focus:ring-teal-500"></textarea>
+          </div>
+        </div>
+        <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex gap-2">
+          <button @click="correction = { chunk_id: '', corrected_text: '', problem_class: '', notes: '' }"
+                  class="px-3 py-2 border border-slate-200 bg-white text-slate-600 rounded-lg text-xs hover:bg-slate-50 transition-colors">
+            Clear
+          </button>
+          <button @click="submitCorrection()"
+                  :disabled="!correction.corrected_text.trim()"
+                  class="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed cjk">
+            Submit correction
+          </button>
         </div>
       </div>
     </div>
@@ -1395,13 +1497,22 @@
         <div class="flex-1 scrollable">
           <template x-for="doc in hitlDocs" :key="doc.id">
             <div>
-              <div class="queue-item px-4 py-2.5 border-b border-slate-800"
-                   :class="hitlDoc && hitlDoc.id === doc.id ? 'active' : ''"
-                   @click="selectHitlDoc(doc.id)">
-                <div class="text-white text-xs font-medium truncate cjk" x-text="doc.title || doc.id"></div>
-                <div class="text-slate-400 text-xs mt-0.5">
-                  <span x-text="doc.page_count"></span> <span x-text="t('upload.pages')"></span> · <span x-text="doc.status"></span>
+              <div class="queue-item px-4 py-2.5 border-b border-slate-800 group flex items-start gap-2"
+                   :class="hitlDoc && hitlDoc.id === doc.id ? 'active' : ''">
+                <div class="flex-1 min-w-0 cursor-pointer" @click="selectHitlDoc(doc.id)">
+                  <div class="text-white text-xs font-medium truncate cjk" x-text="doc.title || doc.id"></div>
+                  <div class="text-slate-400 text-xs mt-0.5">
+                    <span x-text="doc.page_count"></span> <span x-text="t('upload.pages')"></span> · <span x-text="doc.status"></span>
+                  </div>
                 </div>
+                <button @click.stop="confirmDeleteDocument(doc)"
+                        class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 transition-opacity p-1 -m-1"
+                        title="Delete document">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/>
+                  </svg>
+                </button>
               </div>
               <!-- Pages of the selected doc -->
               <div x-show="hitlDoc && hitlDoc.id === doc.id" class="bg-slate-950">
@@ -1434,8 +1545,23 @@
               <!-- Original image -->
               <div class="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col">
                 <div class="px-3 py-2 border-b border-slate-200 text-xs font-semibold text-slate-500 cjk" x-text="t('ocrhitl.original')"></div>
-                <div class="p-2 flex-1 overflow-auto scrollable" style="max-height: 60vh;">
-                  <img x-show="hitlOcr.image_url" :src="hitlOcr.image_url" class="w-full rounded" />
+                <div class="p-2 flex-1 overflow-auto scrollable flex items-center justify-center" style="max-height: 60vh;">
+                  <img x-show="hitlOcr.image_url && !hitlOcrImageBroken"
+                       :src="hitlOcr.image_url"
+                       @error="hitlOcrImageBroken = true"
+                       @load="hitlOcrImageBroken = false"
+                       class="w-full rounded" />
+                  <div x-show="!hitlOcr.image_url || hitlOcrImageBroken"
+                       class="flex flex-col items-center justify-center text-center py-10 text-slate-400">
+                    <svg class="w-12 h-12 mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    <div class="text-sm font-medium text-slate-500 cjk">No original page image</div>
+                    <div class="text-xs mt-1 cjk leading-relaxed max-w-xs">
+                      This page wasn't rasterised during upload, so there's no scanned image to compare the OCR against. The OCR text on the right is still editable.
+                    </div>
+                  </div>
                 </div>
               </div>
               <!-- Engine columns -->
@@ -1786,6 +1912,55 @@
     </div>
   </div>
 
+  <!-- ===== DELETE DOCUMENT CONFIRMATION ===== -->
+  <div x-show="docToDelete"
+       x-transition.opacity
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="background: rgba(0,0,0,0.5);"
+       @keydown.escape.window="docToDelete = null">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4"
+         @click.outside="docToDelete = null">
+      <div class="px-6 pt-6 pb-4">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-slate-800 font-semibold">Delete this document?</h3>
+            <p class="text-sm text-slate-500 mt-1 cjk break-words"
+               x-text="docToDelete && (docToDelete.title || docToDelete.id)"></p>
+            <p class="text-xs text-slate-500 mt-3 leading-relaxed">
+              This permanently removes
+              <span class="font-medium" x-text="docToDelete && (docToDelete.page_count || 0)"></span>
+              page(s), every chunk and chapter under this document, and any
+              scanned images stored alongside them. The deletion cannot
+              be undone.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="px-6 pb-6 flex gap-2 justify-end">
+        <button @click="docToDelete = null"
+                :disabled="docDeleteBusy"
+                class="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 text-sm hover:bg-slate-50 transition-colors disabled:opacity-50">
+          Cancel
+        </button>
+        <button @click="deleteDocumentNow()"
+                :disabled="docDeleteBusy"
+                class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2">
+          <svg x-show="docDeleteBusy" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25"></circle>
+            <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" class="opacity-75"></path>
+          </svg>
+          <span x-text="docDeleteBusy ? 'Deleting…' : 'Delete permanently'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== TOAST NOTIFICATIONS ===== -->
   <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
     <template x-for="toast in toasts" :key="toast.id">
@@ -1824,6 +1999,11 @@
 
         // OCR HITL fusion
         hitlDocs: [],
+        hitlOcrImageBroken: false,
+        docToDelete: null,
+        docDeleteBusy: false,
+        reviewImageVariant: 'original',
+        reviewImageBroken: false,
         hitlDoc: null,
         hitlPages: [],
         hitlPage: null,
@@ -2120,6 +2300,7 @@
         },
 
         async selectHitlPage(pageId) {
+          this.hitlOcrImageBroken = false;
           try {
             const res = await this._authFetch(`/api/hitl/ocr/${encodeURIComponent(pageId)}`);
             const data = await res.json();
@@ -2171,6 +2352,41 @@
             this.hitlDocs = this.hitlDocs.filter(d => d.id !== this.hitlDoc.id);
             this.hitlDoc = null; this.hitlPage = null; this.hitlPages = [];
           } catch (e) { this.showToast(this.t('toast.approveFailed'), 'error'); }
+        },
+
+        confirmDeleteDocument(doc) {
+          // Open the confirm-delete modal with the document the user
+          // clicked. The actual DELETE is fired from the modal's button
+          // so the user has a clear "cancel" path on a destructive op.
+          this.docToDelete = doc;
+          this.docDeleteBusy = false;
+        },
+
+        async deleteDocumentNow() {
+          if (!this.docToDelete) return;
+          const doc = this.docToDelete;
+          this.docDeleteBusy = true;
+          try {
+            const res = await this._authFetch(
+              '/api/documents/' + encodeURIComponent(doc.id),
+              { method: 'DELETE' },
+            );
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              throw new Error(body.detail || `HTTP ${res.status}`);
+            }
+            this.hitlDocs = this.hitlDocs.filter(d => d.id !== doc.id);
+            if (this.hitlDoc && this.hitlDoc.id === doc.id) {
+              this.hitlDoc = null; this.hitlPage = null;
+              this.hitlPages = []; this.hitlOcr = {};
+            }
+            this.showToast(`Deleted “${doc.title || doc.id}”`, 'success');
+            this.docToDelete = null;
+          } catch (e) {
+            this.showToast(`Delete failed: ${e.message}`, 'error');
+          } finally {
+            this.docDeleteBusy = false;
+          }
         },
 
         // ---- INTERACTIVE ----
@@ -2475,6 +2691,10 @@
           this.selectedReviewItem = item;
           this.pageDetail = null;
           this.activeOcrTab = 'fused';
+          this.reviewImageBroken = false;
+          this.reviewImageVariant = 'original';
+          // Clear any leftover correction text from the previous item.
+          this.correction = { chunk_id: '', corrected_text: '', problem_class: '', notes: '' };
           await this.loadPageDetail(item.page_id);
         },
 
@@ -2552,6 +2772,21 @@
           }
           this.correction.notes = '';
           this.showCorrectionModal = true;
+        },
+
+        populateCorrectionSidebar(chunk) {
+          // The /review page now hosts the correction form as a persistent
+          // right sidebar (not a modal), so per-paragraph "submit" links
+          // just pre-fill the sidebar with the clicked paragraph and let
+          // the reviewer edit + submit from there.
+          if (chunk) {
+            this.correction.chunk_id = chunk.chunk_id;
+            this.correction.corrected_text = chunk.text || '';
+            this.correction.problem_class = this.selectedReviewItem
+              ? (this.selectedReviewItem.problem_class || '')
+              : '';
+          }
+          this.correction.notes = '';
         },
 
         async approvePage(pageId) {

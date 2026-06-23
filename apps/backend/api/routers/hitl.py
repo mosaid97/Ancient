@@ -317,6 +317,8 @@ async def ocr_compare(page_id: str, driver: Driver = Depends(get_driver)) -> dic
             MATCH (p:PAGE {id: $pid})
             RETURN p.id AS page_id, p.documentId AS document_id,
                    p.docPageIndex AS page_index, p.language AS language, p.tier AS tier,
+                   p.imageUri AS image_uri,
+                   p.preprocessedImageUri AS preprocessed_uri,
                    p.paddleOcrText AS paddle, p.paddleOcrConfidence AS paddle_conf,
                    p.qwenVlOcrText AS qwen, p.qwenVlOcrConfidence AS qwen_conf,
                    p.deepseekOcrText AS deepseek, p.deepseekOcrConfidence AS deepseek_conf,
@@ -343,13 +345,29 @@ async def ocr_compare(page_id: str, driver: Driver = Depends(get_driver)) -> dic
                 "confidence": d.get(f"{key}_conf"),
                 "char_count": len(text or ""),
             })
+
+    # Only advertise an image_url when the page actually has a stored image.
+    # Pages that came from a non-rasterised native PDF or whose upload pipeline
+    # never reached the rasterise stage have imageUri=NULL; emitting a URL
+    # for those would just give the browser a 404 and a broken-image icon.
+    has_original = bool(d.get("image_uri"))
+    has_preprocessed = bool(d.get("preprocessed_uri"))
+    image_url = (
+        f"/api/image/{page_id}?variant=original" if has_original else None
+    )
+    preprocessed_url = (
+        f"/api/image/{page_id}?variant=preprocessed" if has_preprocessed else None
+    )
+
     return {
         "page_id": page_id,
         "document_id": d["document_id"],
         "page_index": d["page_index"],
         "language": d["language"],
         "tier": d["tier"],
-        "image_url": f"/api/image/{page_id}?variant=original",
+        "image_url": image_url,
+        "preprocessed_image_url": preprocessed_url,
+        "image_available": has_original or has_preprocessed,
         "engines": engines,
         "fused": d["fused"],
         "fusion_source": d["fusion_source"],
